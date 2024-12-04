@@ -1,0 +1,57 @@
+{
+    "name": "risetechapps/orchestrator-link-for-laravel",
+    "description": "",
+    "keywords": [
+        "risetechapps",
+        "service",
+        "forms"
+    ],
+    "homepage": "https://github.com/risetechapps/orchestrator-link-for-laravel",
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Rise Tech",
+            "email": "apps@risetech.com.br",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "illuminate/support": "^9.0|^10.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^7.0|^8.0",
+        "phpunit/phpunit": "^10.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "RiseTechApps\\OrchestratorLink\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "RiseTechApps\\OrchestratorLink\\Tests\\": "tests"
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit",
+        "test-coverage": "vendor/bin/phpunit --coverage-html coverage"
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "RiseTechApps\\OrchestratorLink\\OrchestratorLinkServiceProvider"
+            ],
+            "aliases": {
+                "JointApi":  "RiseTechApps\\OrchestratorLink\\JointApiFacade"
+            }
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "version": "1.0"
+}
