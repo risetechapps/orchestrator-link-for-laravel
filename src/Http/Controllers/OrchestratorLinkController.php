@@ -19,9 +19,9 @@ class OrchestratorLinkController extends Controller
         return response()->json(Service::getCNPJ($request));
     }
 
-    public function cep(Request $request): JsonResponse
+    public function zipCode(Request $request): JsonResponse
     {
-        return response()->json(Service::getCEP($request));
+        return response()->json(Service::getZipCode($request));
     }
 
     public function banks(Request $request): JsonResponse

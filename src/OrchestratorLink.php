@@ -13,7 +13,7 @@ class OrchestratorLink
     {
         Route::get('/services/cpf/{cpf}/{date}', [OrchestratorLinkController::class, 'cpf']);
         Route::get('/services/cnpj/{cnpj}', [OrchestratorLinkController::class, 'cnpj']);
-        Route::get('/services/cep/{cep}', [OrchestratorLinkController::class, 'cep']);
+        Route::get('/services/zip_code/{zip_code}', [OrchestratorLinkController::class, 'zipCode']);
         Route::get('/services/banks', [OrchestratorLinkController::class, 'banks']);
         Route::get('/services/countries', [OrchestratorLinkController::class, 'countries']);
         Route::get('/services/states/{country}', [OrchestratorLinkController::class, 'states']);
