@@ -20,10 +20,10 @@ class Service extends Connection
         return static::request('/cnpj/' . $cnpj);
     }
 
-    public static function getCEP(Request $request): array
+    public static function getZipCode(Request $request): array
     {
-        $cep = $request->cep;
-        return static::request('/cep/' . $cep);
+        $zip_code = $request->zip_code;
+        return static::request('/zip_code/' . $zip_code);
     }
 
     public static function getBanks(Request $request): array
