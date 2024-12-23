@@ -23,5 +23,6 @@ class OrchestratorLink
         Route::get('/services/holidays/{year}/{state}', [OrchestratorLinkController::class, 'holidays']);
         Route::get('/services/all/holidays/{year}', [OrchestratorLinkController::class, 'holidaysAll']);
         Route::get('/services/weather/{city}/{state}', [OrchestratorLinkController::class, 'weather']);
+        Route::get('/services/domain/{domain}', [OrchestratorLinkController::class, 'domain']);
     }
 }
