@@ -79,4 +79,10 @@ class Service extends Connection
         $city = $request->city;
         return static::request('/weather/' . $city . DIRECTORY_SEPARATOR . $state);
     }
+
+    public static function getDomain(Request $request): array
+    {
+        $domain = $request->domain;
+        return static::request('/domain/' . $domain);
+    }
 }
