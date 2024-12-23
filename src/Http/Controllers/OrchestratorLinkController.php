@@ -68,13 +68,10 @@ class OrchestratorLinkController extends Controller
     public function weather(Request $request)
     {
         return response()->json(Service::getWeather($request));
+    }
 
-
-        $data = Service::getWeather($city, $state);
-
-        return response()->json([
-            'success' => !is_null($data),
-            'data' => $data
-        ]);
+    public function domain(Request $request)
+    {
+        return response()->json(Service::getDomain($request));
     }
 }
