@@ -34,9 +34,19 @@ class OrchestratorLinkController extends Controller
         return response()->json(Service::getCountries($request));
     }
 
+    public function countryInfo(Request $request): JsonResponse
+    {
+        return response()->json(Service::getCountryInfo($request));
+    }
+
     public function states(Request $request): JsonResponse
     {
         return response()->json(Service::getStates($request));
+    }
+
+    public function stateInfo(Request $request): JsonResponse
+    {
+        return response()->json(Service::getStateInfo($request->country, $request->state));
     }
 
     public function cities(Request $request): JsonResponse
