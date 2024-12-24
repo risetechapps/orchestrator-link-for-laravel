@@ -16,7 +16,9 @@ class OrchestratorLink
         Route::get('/services/zip_code/{zip_code}', [OrchestratorLinkController::class, 'zipCode']);
         Route::get('/services/banks', [OrchestratorLinkController::class, 'banks']);
         Route::get('/services/countries', [OrchestratorLinkController::class, 'countries']);
+        Route::get('/services/country/{country}', [OrchestratorLinkController::class, 'countryInfo']);
         Route::get('/services/states/{country}', [OrchestratorLinkController::class, 'states']);
+        Route::get('/services/state/{country}/{state}', [OrchestratorLinkController::class, 'stateInfo']);
         Route::get('/services/cities/{country}/{state}', [OrchestratorLinkController::class, 'cities']);
         Route::get('/services/all/states', [OrchestratorLinkController::class, 'statesAll']);
         Route::get('/services/all/cities', [OrchestratorLinkController::class, 'citiesAll']);
