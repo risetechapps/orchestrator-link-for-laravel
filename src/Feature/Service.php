@@ -36,11 +36,21 @@ class Service extends Connection
         return static::request('/countries');
     }
 
+    public static function getCountryInfo(mixed $country): array
+    {
+        return static::request('/country/' . $country);
+    }
+
     public static function getStates(Request $request): array
     {
         $country = $request->country;
 
         return static::request('/states/' . $country);
+    }
+
+    public static function getStateInfo(mixed $country, mixed $state): array
+    {
+        return static::request('/states/' . $country . DIRECTORY_SEPARATOR . $state);
     }
 
     public static function getCities(Request $request): array

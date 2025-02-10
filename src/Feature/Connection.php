@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Http;
 
 abstract class Connection
 {
+    private const Host = "https://api-orchestrator.risetech.dev.br/api/services";
     public static function request($url): array
     {
         $token = config('orchestrator-link.token');
@@ -13,7 +14,7 @@ abstract class Connection
 
         $response = Http::withHeaders([
             'Authorization' => $token,
-        ])->get($host . $url);
+        ])->get(static::Host. $url);
 
         if ($response->failed()) {
             return static::errorResponse();
