@@ -23,9 +23,7 @@ class OrchestratorLinkServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        if (file_exists(base_path('config/orchestrator-link.php'))) {
-            $this->mergeConfigFrom(__DIR__ . '/../config/config.php', 'orchestrator-link');
-        }
+        $this->mergeConfigFrom(__DIR__ . '/../config/config.php', 'orchestrator-link');
         // Register the main class to use with the facade
         $this->app->singleton('orchestratorLink', function () {
             return new OrchestratorLink;
