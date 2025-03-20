@@ -47,7 +47,7 @@
                 "RiseTechApps\\OrchestratorLink\\OrchestratorLinkServiceProvider"
             ],
             "aliases": {
-                "JointApi":  "RiseTechApps\\OrchestratorLink\\JointApiFacade"
+                "OrchestratorLink":  "RiseTechApps\\OrchestratorLink\\OrchestratorLinkFacade"
             }
         }
     },
