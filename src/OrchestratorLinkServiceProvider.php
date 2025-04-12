@@ -25,7 +25,7 @@ class OrchestratorLinkServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/config.php', 'orchestrator-link');
         // Register the main class to use with the facade
-        $this->app->singleton('orchestratorLink', function () {
+        $this->app->singleton(OrchestratorLink::class, function () {
             return new OrchestratorLink;
         });
     }
