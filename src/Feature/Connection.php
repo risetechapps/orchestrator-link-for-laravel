@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Http;
 
 abstract class Connection
 {
-    private const Host = "https://orchestrator.risetech.dev.br/api/v1/services";
+    private const Host = "https://orchestrator.app.br/api/v1/services";
 
     public static function request($url): array
     {
