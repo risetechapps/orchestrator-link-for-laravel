@@ -12,7 +12,7 @@ abstract class Connection
     {
         $token = config('orchestrator-link.token');
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(300)->withHeaders([
             'X-API-KEY' => $token,
         ])->get(Connection::Host. $url);
 
