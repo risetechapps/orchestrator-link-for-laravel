@@ -8,13 +8,21 @@ abstract class Connection
 {
     private const Host = "https://orchestrator.app.br/api/v1/services";
 
-    public static function request($url): array
+    public static function request($url, $method = 'GET', $data = []): array
     {
         $token = config('orchestrator-link.token');
 
-        $response = Http::timeout(300)->withHeaders([
+        $http = Http::timeout(300)->withHeaders([
             'X-API-KEY' => $token,
-        ])->get(Connection::Host. $url);
+        ]);
+
+        $response = match (strtoupper($method)) {
+            'POST' => $http->post(Connection::Host . $url, $data),
+            'PUT' => $http->put(Connection::Host . $url, $data),
+            'PATCH' => $http->patch(Connection::Host . $url),
+            'DELETE' => $http->delete(Connection::Host . $url),
+            default => $http->get(Connection::Host . $url),
+        };
 
         if ($response->failed()) {
             return static::errorResponse();

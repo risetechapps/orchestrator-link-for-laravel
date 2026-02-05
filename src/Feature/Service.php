@@ -59,13 +59,25 @@ class Service extends Connection
         return static::request('/holidays/' . $year . DIRECTORY_SEPARATOR . $state);
     }
 
-    public function getWeather(string $state, string $city): array
+    public function getWeather(string $state, string $city, string $country = ''): array
     {
-        return static::request('/weather/' . $city . DIRECTORY_SEPARATOR . $state);
+        $pathCountry = empty($country) ? $state : $country . DIRECTORY_SEPARATOR . $state;
+        return static::request('/weather/' . $city . DIRECTORY_SEPARATOR . $pathCountry);
     }
 
     public function getDomain(string $domain): array
     {
         return static::request('/domain/' . $domain);
+    }
+
+    public function getCalendar(string $country, string $state, string $city, string $start, string $end): array
+    {
+        return static::request('/calendar/', 'POST', [
+            'dateStart' => $start,
+            'dateEnd' => $end,
+            'country' => $country,
+            'state' => $state,
+            'city' => $city,
+        ]);
     }
 }
