@@ -8,16 +8,19 @@ class Service extends Connection
 {
     public function getCPF(string $cpf, string $date): array
     {
+        $cpf = preg_replace('/[^0-9]/', '', $cpf);
         return static::request('/cpf/' . $cpf . DIRECTORY_SEPARATOR . $date);
     }
 
     public function getCNPJ(string $cnpj): array
     {
+        $cnpj = preg_replace('/[^0-9]/', '', $cnpj);
         return static::request('/cnpj/' . $cnpj);
     }
 
     public function getZipCode(string $zip_code): array
     {
+        $zip_code = preg_replace('/[^0-9]/', '', $zip_code);
         return static::request('/zip_code/' . $zip_code);
     }
 
