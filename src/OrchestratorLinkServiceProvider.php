@@ -12,10 +12,16 @@ class OrchestratorLinkServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
+
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 __DIR__ . '/../config/config.php' => config_path('orchestrator-link.php'),
             ], 'config');
+
+            $this->publishes([
+                __DIR__ . '/../database/migrations' => database_path('migrations'),
+            ], 'orchestrator-link-migrations');
         }
 
         $this->registerMacros();

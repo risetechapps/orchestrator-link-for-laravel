@@ -9,79 +9,206 @@ use RiseTechApps\OrchestratorLink\Feature\Service;
 
 class OrchestratorLinkController extends Controller
 {
-    public function cpf(Request $request): JsonResponse
+    private Service $service;
+
+    public function __construct()
     {
-        return response()->json(Service::getCPF($request));
+        $this->service = new Service();
     }
 
-    public function cnpj(Request $request): JsonResponse
+    // ─── CPF / CNPJ / CEP ────────────────────────────────────────────────────
+
+    public function cpf(Request $request, string $cpf, string $date = ''): JsonResponse
     {
-        return response()->json(Service::getCNPJ($request));
+        return response()->json($this->service->getCPF($cpf, $date));
     }
 
-    public function zipCode(Request $request): JsonResponse
+    public function cnpj(Request $request, string $cnpj): JsonResponse
     {
-        return response()->json(Service::getZipCode($request));
+        return response()->json($this->service->getCNPJ($cnpj));
     }
 
-    public function banks(Request $request): JsonResponse
+    public function zipCode(Request $request, string $zip_code): JsonResponse
     {
-        return response()->json(Service::getBanks($request));
+        return response()->json($this->service->getZipCode($zip_code));
     }
 
-    public function countries(Request $request): JsonResponse
+    // ─── Bancos / Países / Estados / Cidades ─────────────────────────────────
+
+    public function banks(): JsonResponse
     {
-        return response()->json(Service::getCountries($request));
+        return response()->json($this->service->getBanks());
     }
 
-    public function countryInfo(Request $request): JsonResponse
+    public function countries(): JsonResponse
     {
-        return response()->json(Service::getCountryInfo($request));
+        return response()->json($this->service->getCountries());
     }
 
-    public function states(Request $request): JsonResponse
+    public function countryInfo(Request $request, string $country): JsonResponse
     {
-        return response()->json(Service::getStates($request));
+        return response()->json($this->service->getCountryInfo($country));
     }
 
-    public function stateInfo(Request $request): JsonResponse
+    public function states(Request $request, string $country): JsonResponse
     {
-        return response()->json(Service::getStateInfo($request->country, $request->state));
+        return response()->json($this->service->getStates($country));
     }
 
-    public function cities(Request $request): JsonResponse
+    public function stateInfo(Request $request, string $country, string $state): JsonResponse
     {
-        return response()->json(Service::getCities($request));
+        return response()->json($this->service->getStateInfo($country, $state));
     }
 
-
-    public function statesAll(Request $request): JsonResponse
+    public function cities(Request $request, string $country, string $state): JsonResponse
     {
-        return response()->json(Service::getStatesAll($request));
+        return response()->json($this->service->getCities($country, $state));
     }
 
-    public function citiesAll(Request $request): JsonResponse
+    // ─── Feriados / Clima / Domínio / Calendário ─────────────────────────────
+
+    public function holidays(Request $request, string $year, string $state): JsonResponse
     {
-        return response()->json(Service::getCitiesAll($request));
+        return response()->json($this->service->getHolidays($state, $year));
     }
 
-    public function holidays(Request $request)
+    public function weather(Request $request, string $city, string $country, string $state = ''): JsonResponse
     {
-        return response()->json(Service::getHolidays($request));
+        return response()->json($this->service->getWeather($city, $country, $state));
     }
 
-    public function holidaysAll(Request $request)
+    public function domain(Request $request, string $domain): JsonResponse
     {
-        return response()->json(Service::getHolidaysAll($request));
+        return response()->json($this->service->getDomain($domain));
     }
 
-    public function weather(Request $request)
+    public function calendar(Request $request): JsonResponse
     {
-        return response()->json(Service::getWeather($request));
+        return response()->json($this->service->getCalendar(
+            $request->input('country'),
+            $request->input('state'),
+            $request->input('city'),
+            $request->input('dateStart'),
+            $request->input('dateEnd'),
+        ));
     }
 
-    public function domain(Request $request)
+    // ─── FIPE ────────────────────────────────────────────────────────────────
+
+    public function fipeBrands(Request $request, string $type): JsonResponse
     {
-        return response()->json(Service::getDomain($request));
+        return response()->json($this->service->getFipeBrands($type));
+    }
+
+    public function fipeModels(Request $request, string $type, string $brand): JsonResponse
+    {
+        return response()->json($this->service->getFipeModels($type, $brand));
+    }
+
+    public function fipeYears(Request $request, string $type, string $brand, string $model): JsonResponse
+    {
+        return response()->json($this->service->getFipeYears($type, $brand, $model));
+    }
+
+    public function fipePrice(Request $request, string $type, string $brand, string $model, string $year): JsonResponse
+    {
+        return response()->json($this->service->getFipePrice($type, $brand, $model, $year));
+    }
+
+    // ─── Câmbio ──────────────────────────────────────────────────────────────
+
+    public function exchange(Request $request, string $from, string $to): JsonResponse
+    {
+        return response()->json($this->service->getExchange($from, $to));
+    }
+
+    // ─── Ações B3 ────────────────────────────────────────────────────────────
+
+    public function stocks(Request $request, string $symbol): JsonResponse
+    {
+        return response()->json($this->service->getStock($symbol));
+    }
+
+    // ─── NCM ─────────────────────────────────────────────────────────────────
+
+    public function ncm(Request $request, string $code): JsonResponse
+    {
+        return response()->json($this->service->getNcm($code));
+    }
+
+    public function ncmSearch(Request $request): JsonResponse
+    {
+        return response()->json($this->service->searchNcm($request->query('search', '')));
+    }
+
+    // ─── Shipping (Melhor Envio) ──────────────────────────────────────────────
+
+    public function shippingCarriers(): JsonResponse
+    {
+        return response()->json($this->service->getCarriers());
+    }
+
+    public function shippingCalculate(Request $request): JsonResponse
+    {
+        return response()->json($this->service->calculateShipping($request->all()));
+    }
+
+    public function shippingAddToCart(Request $request): JsonResponse
+    {
+        return response()->json($this->service->addToCart($request->all()));
+    }
+
+    public function shippingRemoveFromCart(Request $request, string $id): JsonResponse
+    {
+        return response()->json($this->service->removeFromCart($id));
+    }
+
+    public function shippingCheckout(Request $request): JsonResponse
+    {
+        return response()->json($this->service->checkout($request->input('orders', [])));
+    }
+
+    public function shippingGenerateLabels(Request $request): JsonResponse
+    {
+        return response()->json($this->service->generateLabels($request->input('orders', [])));
+    }
+
+    public function shippingPrintLabels(Request $request): JsonResponse
+    {
+        return response()->json($this->service->printLabels(
+            $request->input('orders', []),
+            $request->input('mode', 'public')
+        ));
+    }
+
+    public function shippingCancelLabel(Request $request): JsonResponse
+    {
+        return response()->json($this->service->cancelLabel(
+            $request->input('id'),
+            $request->input('description', 'Cancelado via integração')
+        ));
+    }
+
+    public function shippingListOrders(Request $request): JsonResponse
+    {
+        return response()->json($this->service->listOrders(
+            $request->query('status'),
+            (int) $request->query('page', 1)
+        ));
+    }
+
+    public function shippingGetOrder(Request $request, string $id): JsonResponse
+    {
+        return response()->json($this->service->getOrder($id));
+    }
+
+    public function shippingSearchOrder(Request $request): JsonResponse
+    {
+        return response()->json($this->service->searchOrder($request->query('q', '')));
+    }
+
+    public function shippingTrack(Request $request): JsonResponse
+    {
+        return response()->json($this->service->trackShipment($request->input('orders', [])));
     }
 }
