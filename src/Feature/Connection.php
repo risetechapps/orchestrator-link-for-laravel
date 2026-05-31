@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Http;
 abstract class Connection
 {
     private const Host = "https://orchestrator.app.br/api/v1/services";
+//    private const Host = "https://orchestrator.risetech.dev.br/api/v1/services";
 
     public static function request($url, $method = 'GET', $data = []): array
     {
@@ -14,6 +15,7 @@ abstract class Connection
 
         $http = Http::timeout(300)->withHeaders([
             'X-API-KEY' => $token,
+            'Accept'    => 'application/json',
         ]);
 
         $response = match (strtoupper($method)) {
