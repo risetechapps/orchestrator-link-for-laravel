@@ -30,13 +30,12 @@ class OrchestratorLinkServiceProvider extends ServiceProvider
     /**
      * Register the application services.
      */
+    #[\Override]
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/config.php', 'orchestrator-link');
         // Register the main class to use with the facade
-        $this->app->singleton(OrchestratorLink::class, function () {
-            return new OrchestratorLink;
-        });
+        $this->app->singleton(OrchestratorLink::class, fn() => new OrchestratorLink);
     }
 
     protected function registerMacros(): void

@@ -9,7 +9,7 @@ use RiseTechApps\OrchestratorLink\Feature\Service;
 
 class OrchestratorLinkController extends Controller
 {
-    private Service $service;
+    private readonly Service $service;
 
     public function __construct()
     {

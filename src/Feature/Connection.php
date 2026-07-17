@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Http;
 
 abstract class Connection
 {
-    private const Host = "https://orchestrator.app.br/api/v1/services";
+    private const string Host = "https://orchestrator.app.br/api/v1/services";
 //    private const Host = "https://orchestrator.risetech.dev.br/api/v1/services";
 
     public static function request($url, $method = 'GET', $data = []): array
@@ -18,7 +18,7 @@ abstract class Connection
             'Accept'    => 'application/json',
         ]);
 
-        $response = match (strtoupper($method)) {
+        $response = match (strtoupper((string) $method)) {
             'POST' => $http->post(Connection::Host . $url, $data),
             'PUT' => $http->put(Connection::Host . $url, $data),
             'PATCH' => $http->patch(Connection::Host . $url),
