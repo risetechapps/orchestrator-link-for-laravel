@@ -101,27 +101,9 @@ Isso registra as rotas abaixo no seu app:
 
 ---
 
-## Macros de resposta (opcional)
+## Macros de resposta
 
-O package registra macros no `ResponseFactory` para padronizar respostas JSON:
-
-```php
-// 200 OK — sucesso com dados
-return response()->jsonSuccess($data);
-// {"success": true, "data": [...]}
-
-// 412 Precondition Failed — erro com mensagem
-return response()->jsonError('Mensagem de erro');
-// {"success": false, "message": "Mensagem de erro"}
-
-// 410 Gone — recurso removido
-return response()->jsonGone('Recurso não disponível');
-// {"success": false, "message": "Recurso não disponível"}
-
-// 422 Unprocessable Entity — falha de validação
-return response()->jsonNotValidated('Dados inválidos');
-// {"success": false, "message": "Dados inválidos"}
-```
+> **Movidas a partir da v2.0.0.** As macros `jsonSuccess`, `jsonError`, `jsonGone` e `jsonNotValidated` **não são mais registradas por este package** — passaram a ser providas por outro package **risetechapps/risetools**.
 
 ---
 
@@ -135,6 +117,36 @@ Todos os métodos do helper `orchestrator()` retornam:
     'data'    => [...],
 ]
 ```
+
+`success => false` com `data => []` é o retorno de **qualquer falha** — os métodos **nunca lançam exceção** para não derrubar a request (degradação graciosa). Cai nesse retorno quando:
+
+| Situação | Comportamento | Log |
+|---|---|---|
+| Timeout / DNS / conexão recusada | `errorResponse` (não vira HTTP 500) | `warning` |
+| HTTP 5xx (orchestrator quebrado) | `errorResponse` | `error` |
+| HTTP 4xx (401/404/429...) | `errorResponse` | `warning` (com status + corpo) |
+| `ORCHESTRATOR_TOKEN` não configurado | `errorResponse` **sem** sair pra rede | `error` |
+| Corpo não-JSON / shape inesperado | `success:false`, `data:[]` (não quebra) | — |
+
+Sempre confira `success` antes de usar `data`.
+
+### Resiliência (timeouts / retry)
+
+- `connectTimeout` 5s + `timeout` 15s por tentativa — a chamada roda dentro da request web e não prende o worker.
+- **Retry só em GET** (idempotente): 2 re-tentativas em falha de rede. POST/PUT/PATCH/DELETE **não** repetem (evita duplicar checkout/etiqueta).
+
+### Cache
+
+Respostas de **GET com sucesso** são cacheadas por tipo de volatilidade. POST e falhas **nunca** são cacheados. Invalidação é por TTL (sem flush manual).
+
+| TTL | Endpoints |
+|---|---|
+| **30 dias** | bancos, países, estados, cidades, feriados, FIPE (marcas/modelos/anos/preço), NCM, CEP |
+| **1 dia** | CNPJ, transportadoras (`getCarriers`) |
+| **1 hora** | domínio (WHOIS) |
+| **sem cache** | CPF, clima, câmbio, ações B3, calendário e todas as operações de shipping (carrinho/checkout/etiquetas/pedidos/rastreio) |
+
+> Em ambiente multi-tenant, o cache é isolado por tenant — cada tenant busca o dado uma vez por TTL. Com os TTLs longos, a redundância é desprezível.
 
 ---
 
