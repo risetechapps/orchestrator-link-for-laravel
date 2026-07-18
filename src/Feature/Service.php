@@ -20,52 +20,52 @@ class Service extends Connection
     public function getCNPJ(string $cnpj): array
     {
         $cnpj = preg_replace('/[^0-9]/', '', $cnpj);
-        return static::request('/cnpj/' . $cnpj);
+        return static::request('/cnpj/' . $cnpj, cacheTtl: self::TTL_DAY);
     }
 
     public function getZipCode(string $zip_code): array
     {
         $zip_code = preg_replace('/[^0-9]/', '', $zip_code);
-        return static::request('/zip_code/' . $zip_code);
+        return static::request('/zip_code/' . $zip_code, cacheTtl: self::TTL_STATIC);
     }
 
     // ─── Bancos / Países / Estados / Cidades ─────────────────────────────────
 
     public function getBanks(): array
     {
-        return static::request('/banks');
+        return static::request('/banks', cacheTtl: self::TTL_STATIC);
     }
 
     public function getCountries(): array
     {
-        return static::request('/countries');
+        return static::request('/countries', cacheTtl: self::TTL_STATIC);
     }
 
     public function getCountryInfo(string $country): array
     {
-        return static::request('/country/' . $country);
+        return static::request('/country/' . $country, cacheTtl: self::TTL_STATIC);
     }
 
     public function getStates(string $country): array
     {
-        return static::request('/states/' . $country);
+        return static::request('/states/' . $country, cacheTtl: self::TTL_STATIC);
     }
 
     public function getStateInfo(string $country, string $state): array
     {
-        return static::request('/states/' . $country . '/' . $state);
+        return static::request('/states/' . $country . '/' . $state, cacheTtl: self::TTL_STATIC);
     }
 
     public function getCities(string $country, string $state): array
     {
-        return static::request('/cities/' . $country . '/' . $state);
+        return static::request('/cities/' . $country . '/' . $state, cacheTtl: self::TTL_STATIC);
     }
 
     // ─── Feriados / Clima / Domínio / Calendário ──────────────────────────────
 
     public function getHolidays(string $state, string $year): array
     {
-        return static::request('/holidays/' . $year . '/' . $state);
+        return static::request('/holidays/' . $year . '/' . $state, cacheTtl: self::TTL_STATIC);
     }
 
     public function getWeather(string $city, string $country, string $state = ''): array
@@ -77,7 +77,7 @@ class Service extends Connection
     public function getDomain(string $domain): array
     {
         $domain = Str::replace(['https://', 'http://'], '', $domain);
-        return static::request('/domain/' . $domain);
+        return static::request('/domain/' . $domain, cacheTtl: self::TTL_HOUR);
     }
 
     public function getCalendar(string $country, string $state, string $city, string $start, string $end): array
@@ -95,22 +95,22 @@ class Service extends Connection
 
     public function getFipeBrands(string $type): array
     {
-        return static::request('/fipe/' . $type . '/brands');
+        return static::request('/fipe/' . $type . '/brands', cacheTtl: self::TTL_STATIC);
     }
 
     public function getFipeModels(string $type, string $brand): array
     {
-        return static::request('/fipe/' . $type . '/' . $brand . '/models');
+        return static::request('/fipe/' . $type . '/' . $brand . '/models', cacheTtl: self::TTL_STATIC);
     }
 
     public function getFipeYears(string $type, string $brand, string $model): array
     {
-        return static::request('/fipe/' . $type . '/' . $brand . '/' . $model . '/years');
+        return static::request('/fipe/' . $type . '/' . $brand . '/' . $model . '/years', cacheTtl: self::TTL_STATIC);
     }
 
     public function getFipePrice(string $type, string $brand, string $model, string $year): array
     {
-        return static::request('/fipe/' . $type . '/' . $brand . '/' . $model . '/' . $year);
+        return static::request('/fipe/' . $type . '/' . $brand . '/' . $model . '/' . $year, cacheTtl: self::TTL_STATIC);
     }
 
     // ─── Câmbio ──────────────────────────────────────────────────────────────
@@ -132,19 +132,19 @@ class Service extends Connection
     public function getNcm(string $code): array
     {
         $code = preg_replace('/[^0-9]/', '', $code);
-        return static::request('/ncm/' . $code);
+        return static::request('/ncm/' . $code, cacheTtl: self::TTL_STATIC);
     }
 
     public function searchNcm(string $term): array
     {
-        return static::request('/ncm?search=' . urlencode($term));
+        return static::request('/ncm?search=' . urlencode($term), cacheTtl: self::TTL_STATIC);
     }
 
     // ─── Shipping (Melhor Envio) ──────────────────────────────────────────────
 
     public function getCarriers(): array
     {
-        return static::request('/shipping/carriers');
+        return static::request('/shipping/carriers', cacheTtl: self::TTL_DAY);
     }
 
     public function calculateShipping(array $data): array
