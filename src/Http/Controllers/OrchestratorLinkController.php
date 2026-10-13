@@ -5,6 +5,7 @@ namespace RiseTechApps\OrchestratorLink\Http\Controllers;
 use Illuminate\Routing\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 use RiseTechApps\OrchestratorLink\Feature\Service;
 
 class OrchestratorLinkController extends Controller
@@ -31,6 +32,28 @@ class OrchestratorLinkController extends Controller
     public function zipCode(Request $request, string $zip_code): JsonResponse
     {
         return response()->json($this->service->getZipCode($zip_code));
+    }
+
+    // ─── Empresa: sócios, Simples/MEI e CNAE ─────────────────────────────────
+
+    public function cnpjPartners(Request $request, string $cnpj): JsonResponse
+    {
+        return response()->json($this->service->getCnpjPartners($cnpj));
+    }
+
+    public function cnpjSimples(Request $request, string $cnpj): JsonResponse
+    {
+        return response()->json($this->service->getCnpjSimples($cnpj));
+    }
+
+    public function cnae(Request $request, string $code): JsonResponse
+    {
+        return response()->json($this->service->getCnae($code));
+    }
+
+    public function cnaeSearch(Request $request): JsonResponse
+    {
+        return response()->json($this->service->searchCnae((string) $request->query('search', '')));
     }
 
     // ─── Bancos / Países / Estados / Cidades ─────────────────────────────────
@@ -63,6 +86,33 @@ class OrchestratorLinkController extends Controller
     public function cities(Request $request, string $country, string $state): JsonResponse
     {
         return response()->json($this->service->getCities($country, $state));
+    }
+
+    // ─── Código IBGE / Geolocalização ────────────────────────────────────────
+
+    public function ibgeCities(Request $request, string $uf): JsonResponse
+    {
+        return response()->json($this->service->getIbgeCities($uf, $request->query('name')));
+    }
+
+    public function ibgeCity(Request $request, string $code): JsonResponse
+    {
+        return response()->json($this->service->getIbgeCity($code));
+    }
+
+    public function ibgeZipCode(Request $request, string $zip_code): JsonResponse
+    {
+        return response()->json($this->service->getIbgeByZipCode($zip_code));
+    }
+
+    public function geoZipCode(Request $request, string $zip_code): JsonResponse
+    {
+        return response()->json($this->service->getGeoByZipCode($zip_code));
+    }
+
+    public function geoDistance(Request $request, string $from, string $to): JsonResponse
+    {
+        return response()->json($this->service->getDistance($from, $to));
     }
 
     // ─── Feriados / Clima / Domínio / Calendário ─────────────────────────────
@@ -129,6 +179,30 @@ class OrchestratorLinkController extends Controller
         return response()->json($this->service->getStock($symbol));
     }
 
+    public function stocksCatalog(Request $request): JsonResponse
+    {
+        return response()->json($this->service->getStocks(
+            $request->only(['search', 'sector', 'type', 'sort_by', 'sort_order', 'limit', 'page'])
+        ));
+    }
+
+    // ─── Indicadores / PIX ───────────────────────────────────────────────────
+
+    public function indicators(): JsonResponse
+    {
+        return response()->json($this->service->getIndicators());
+    }
+
+    public function indicator(Request $request, string $indicator): JsonResponse
+    {
+        return response()->json($this->service->getIndicator($indicator, $request->query('from'), $request->query('to')));
+    }
+
+    public function pixDecode(Request $request): JsonResponse
+    {
+        return response()->json($this->service->decodePix((string) $request->input('code', '')));
+    }
+
     // ─── NCM ─────────────────────────────────────────────────────────────────
 
     public function ncm(Request $request, string $code): JsonResponse
@@ -141,74 +215,166 @@ class OrchestratorLinkController extends Controller
         return response()->json($this->service->searchNcm($request->query('search', '')));
     }
 
-    // ─── Shipping (Melhor Envio) ──────────────────────────────────────────────
-
-    public function shippingCarriers(): JsonResponse
+    public function ncmTaxes(Request $request, string $code): JsonResponse
     {
-        return response()->json($this->service->getCarriers());
+        return response()->json($this->service->getNcmTaxes($code, (string) $request->query('uf', '')));
     }
 
-    public function shippingCalculate(Request $request): JsonResponse
+    // ─── Validação: e-mail e telefone ────────────────────────────────────────
+
+    public function email(Request $request, string $email): JsonResponse
     {
-        return response()->json($this->service->calculateShipping($request->all()));
+        return response()->json($this->service->validateEmail($email));
     }
 
-    public function shippingAddToCart(Request $request): JsonResponse
+    public function phone(Request $request, string $phone): JsonResponse
     {
-        return response()->json($this->service->addToCart($request->all()));
+        return response()->json($this->service->validatePhone($phone));
     }
 
-    public function shippingRemoveFromCart(Request $request, string $id): JsonResponse
+    // ─── Frete (white label) ─────────────────────────────────────────────────
+
+    public function shippingServices(): JsonResponse
     {
-        return response()->json($this->service->removeFromCart($id));
+        return response()->json($this->service->getShippingServices());
     }
 
-    public function shippingCheckout(Request $request): JsonResponse
+    public function shippingQuote(Request $request): JsonResponse
     {
-        return response()->json($this->service->checkout($request->input('orders', [])));
+        return response()->json($this->service->quoteShipping($request->all()));
     }
 
-    public function shippingGenerateLabels(Request $request): JsonResponse
+    public function shippingAgencies(Request $request): JsonResponse
     {
-        return response()->json($this->service->generateLabels($request->input('orders', [])));
-    }
-
-    public function shippingPrintLabels(Request $request): JsonResponse
-    {
-        return response()->json($this->service->printLabels(
-            $request->input('orders', []),
-            $request->input('mode', 'public')
+        return response()->json($this->service->getShippingAgencies(
+            (int) $request->query('service'),
+            (string) $request->query('postal_code', ''),
+            (string) $request->query('state', ''),
+            (string) $request->query('city', ''),
+            $request->query('district'),
         ));
     }
 
-    public function shippingCancelLabel(Request $request): JsonResponse
+    public function shippingSenders(): JsonResponse
     {
-        return response()->json($this->service->cancelLabel(
-            $request->input('id'),
-            $request->input('description', 'Cancelado via integração')
+        return response()->json($this->service->getShippingSenders());
+    }
+
+    public function shippingCreateSender(Request $request): JsonResponse
+    {
+        return response()->json($this->service->createShippingSender($request->all()));
+    }
+
+    public function shippingUpdateSender(Request $request, int $sender): JsonResponse
+    {
+        return response()->json($this->service->updateShippingSender($sender, $request->all()));
+    }
+
+    public function shippingDeleteSender(int $sender): JsonResponse
+    {
+        return response()->json($this->service->deleteShippingSender($sender));
+    }
+
+    public function shippingListShipments(Request $request): JsonResponse
+    {
+        return response()->json($this->service->listShipments(
+            $request->only(['status', 'external_reference', 'label_code', 'per_page', 'page'])
         ));
     }
 
-    public function shippingListOrders(Request $request): JsonResponse
+    public function shippingCreateShipment(Request $request): JsonResponse
     {
-        return response()->json($this->service->listOrders(
-            $request->query('status'),
-            (int) $request->query('page', 1)
+        return response()->json($this->service->createShipment($request->all(), $request->header('Idempotency-Key')));
+    }
+
+    public function shippingShowShipment(string $shipment): JsonResponse
+    {
+        return response()->json($this->service->getShipment($shipment));
+    }
+
+    public function shippingPurchase(Request $request, string $shipment): JsonResponse
+    {
+        return response()->json($this->service->purchaseShipment($shipment, $request->header('Idempotency-Key')));
+    }
+
+    public function shippingPayment(string $shipment): JsonResponse
+    {
+        return response()->json($this->service->getShipmentPayment($shipment));
+    }
+
+    public function shippingPayMany(Request $request): JsonResponse
+    {
+        return response()->json($this->service->payShipments(
+            (array) $request->input('shipment_ids', []),
+            $request->header('Idempotency-Key')
         ));
     }
 
-    public function shippingGetOrder(Request $request, string $id): JsonResponse
+    public function shippingPaymentGroup(string $group): JsonResponse
     {
-        return response()->json($this->service->getOrder($id));
+        return response()->json($this->service->getShipmentPaymentGroup($group));
     }
 
-    public function shippingSearchOrder(Request $request): JsonResponse
+    public function shippingSimulatePayment(string $shipment): JsonResponse
     {
-        return response()->json($this->service->searchOrder($request->query('q', '')));
+        return response()->json($this->service->simulateShipmentPayment($shipment));
     }
 
-    public function shippingTrack(Request $request): JsonResponse
+    public function shippingReverse(Request $request, string $shipment): JsonResponse
     {
-        return response()->json($this->service->trackShipment($request->input('orders', [])));
+        return response()->json($this->service->reverseShipment($shipment, $request->all(), $request->header('Idempotency-Key')));
+    }
+
+    public function shippingCancel(Request $request, string $shipment): JsonResponse
+    {
+        return response()->json($this->service->cancelShipment($shipment, $request->input('reason')));
+    }
+
+    public function shippingTracking(string $shipment): JsonResponse
+    {
+        return response()->json($this->service->trackShipment($shipment));
+    }
+
+    public function shippingLabel(string $shipment): Response
+    {
+        return $this->pdf($this->service->getShipmentLabel($shipment));
+    }
+
+    public function shippingLabels(Request $request): Response
+    {
+        $ids = array_filter(explode(',', (string) $request->query('ids', '')));
+
+        return $this->pdf($this->service->getShipmentLabels($ids));
+    }
+
+    public function shippingWebhook(): JsonResponse
+    {
+        return response()->json($this->service->getShippingWebhook());
+    }
+
+    public function shippingUpdateWebhook(Request $request): JsonResponse
+    {
+        return response()->json($this->service->setShippingWebhook((string) $request->input('url', '')));
+    }
+
+    public function shippingDeleteWebhook(): JsonResponse
+    {
+        return response()->json($this->service->deleteShippingWebhook());
+    }
+
+    /** PDF do orchestrator repassado como arquivo; falha, como o JSON das demais rotas. */
+    private function pdf(array $result): Response
+    {
+        if (!$result['success']) {
+            return response()->json($result);
+        }
+
+        $filename = $result['data']['filename'] ?? 'etiqueta.pdf';
+
+        return response($result['data']['content'], 200, [
+            'Content-Type'        => $result['data']['content_type'],
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+            'Cache-Control'       => 'private, no-store',
+        ]);
     }
 }

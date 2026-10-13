@@ -26,6 +26,18 @@ class ShippingVolume
         return $this;
     }
 
+    // Produto dentro deste volume. Nos Correios (um volume por objeto), cada
+    // volume precisa dos próprios produtos para a declaração de conteúdo.
+    public function addProduct(ShippingProduct|callable $product): self
+    {
+        if (is_callable($product)) {
+            $product = $product(ShippingProduct::make());
+        }
+
+        $this->data['products'][] = $product->toDeclaration();
+        return $this;
+    }
+
     public function toArray(): array
     {
         return $this->data;

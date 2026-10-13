@@ -1,6 +1,8 @@
 # Orchestrator Link for Laravel
 
-Package Laravel para comunicação com a API Orchestrator da RiseTech. Fornece acesso a dados de CPF, CNPJ, CEP, bancos, países, estados, cidades, clima, feriados, calendário, WHOIS, FIPE, câmbio, ações B3, NCM e envio de encomendas via Melhor Envio.
+Package Laravel para comunicação com a API Orchestrator da RiseTech. Fornece acesso a dados de CPF, CNPJ (com sócios e Simples/MEI), CNAE, CEP, código IBGE, geolocalização, bancos, países, estados, cidades, clima, feriados, calendário, WHOIS, FIPE, câmbio, ações B3, indicadores do Banco Central, PIX copia e cola, NCM (com tributos), validação de e-mail e telefone, e frete white label (cotação, envio, PIX, etiqueta e rastreio).
+
+> **Versão 3.0** acompanha o orchestrator 4.0. O módulo de frete mudou por completo: veja [Atualizando da 2.x](#atualizando-da-2x).
 
 ---
 
@@ -20,7 +22,12 @@ Adicione ao seu `.env`:
 
 ```env
 ORCHESTRATOR_TOKEN=seu_token_aqui
+
+# Opcional: outro ambiente (homologação, túnel local...). Padrão: produção.
+ORCHESTRATOR_URL=https://orchestrator.app.br/api/v1/services
 ```
+
+A chave de teste da conta também funciona: no frete, ela cria envios de teste (sandbox), sem cobrança real.
 
 ### Publicar config (opcional)
 
@@ -33,6 +40,7 @@ Isso cria `config/orchestrator-link.php`:
 ```php
 return [
     'token' => env('ORCHESTRATOR_TOKEN', ''),
+    'url'   => env('ORCHESTRATOR_URL', 'https://orchestrator.app.br/api/v1/services'),
 ];
 ```
 
@@ -61,6 +69,8 @@ Para expor os endpoints como proxy na sua aplicação:
 \RiseTechApps\OrchestratorLink\OrchestratorLink::routes();
 ```
 
+> As rotas usam a chave da **sua** conta no orchestrator. Coloque-as atrás da autenticação da sua app (`Route::middleware('auth')->group(...)`): sem isso, qualquer visitante consulta com a sua cota e, no frete, vê e cria envios da conta.
+
 Isso registra as rotas abaixo no seu app:
 
 | Método | Rota | Serviço |
@@ -68,6 +78,15 @@ Isso registra as rotas abaixo no seu app:
 | GET | `/services/cpf/{cpf}/{date?}` | CPF |
 | GET | `/services/cnpj/{cnpj}` | CNPJ |
 | GET | `/services/zip_code/{zip_code}` | CEP |
+| GET | `/services/cnpj/{cnpj}/partners` | Sócios do CNPJ |
+| GET | `/services/cnpj/{cnpj}/simples` | Simples Nacional e MEI |
+| GET | `/services/cnae/{code}` | CNAE por código |
+| GET | `/services/cnae?search=` | Busca CNAE |
+| GET | `/services/ibge/cities/{uf}?name=` | Municípios da UF (código IBGE) |
+| GET | `/services/ibge/city/{code}` | Município pelo código IBGE |
+| GET | `/services/ibge/zip_code/{zip_code}` | Código IBGE do CEP |
+| GET | `/services/geo/zip_code/{zip_code}` | Coordenadas do CEP |
+| GET | `/services/geo/distance/{from}/{to}` | Distância entre CEPs |
 | GET | `/services/banks` | Bancos |
 | GET | `/services/countries` | Países |
 | GET | `/services/country/{country}` | Info de país |
@@ -84,20 +103,33 @@ Isso registra as rotas abaixo no seu app:
 | GET | `/services/fipe/{type}/{brand}/{model}/{year}` | Preço FIPE |
 | GET | `/services/exchange/{from}/{to}` | Câmbio |
 | GET | `/services/stocks/{symbol}` | Ações B3 |
+| GET | `/services/stocks` | Catálogo da B3 |
+| GET | `/services/indicators` | Indicadores econômicos |
+| GET | `/services/indicators/{indicator}?from=&to=` | Um indicador / série |
+| POST | `/services/pix/decode` | PIX copia e cola |
 | GET | `/services/ncm/search` | NCM por descrição |
 | GET | `/services/ncm/{code}` | NCM por código |
-| GET | `/services/shipping/carriers` | Transportadoras |
-| POST | `/services/shipping/calculate` | Calcular frete |
-| POST | `/services/shipping/cart` | Adicionar ao carrinho |
-| DELETE | `/services/shipping/cart/{id}` | Remover do carrinho |
-| POST | `/services/shipping/checkout` | Checkout |
-| POST | `/services/shipping/labels/generate` | Gerar etiquetas |
-| POST | `/services/shipping/labels/print` | Imprimir etiquetas |
-| POST | `/services/shipping/labels/cancel` | Cancelar etiqueta |
-| GET | `/services/shipping/orders` | Listar pedidos |
-| GET | `/services/shipping/orders/search` | Pesquisar pedido |
-| GET | `/services/shipping/orders/{id}` | Detalhes do pedido |
-| POST | `/services/shipping/track` | Rastrear envio |
+| GET | `/services/ncm/{code}/taxes?uf=` | Tributos do NCM (IBPT) |
+| GET | `/services/email/{email}` | Validação de e-mail |
+| GET | `/services/phone/{phone}` | Validação de telefone |
+| GET | `/services/shipping/services` | Serviços de entrega |
+| POST | `/services/shipping/quotes` | Cotação |
+| GET | `/services/shipping/agencies` | Agências de postagem |
+| GET/POST | `/services/shipping/senders` | Remetentes salvos |
+| PUT/DELETE | `/services/shipping/senders/{id}` | Altera/remove remetente |
+| GET/POST | `/services/shipping/shipments` | Lista/cria envios |
+| GET | `/services/shipping/shipments/{id}` | Envio |
+| POST | `/services/shipping/shipments/{id}/purchase` | Gera o PIX |
+| GET | `/services/shipping/shipments/{id}/payment` | Pagamento |
+| POST | `/services/shipping/shipments/{id}/payment/simulate` | Simula pagamento (chave de teste) |
+| POST | `/services/shipping/shipments/payments` | Um PIX para vários envios |
+| GET | `/services/shipping/shipments/payments/{group}` | Situação do PIX de vários |
+| POST | `/services/shipping/shipments/{id}/cancel` | Cancela |
+| POST | `/services/shipping/shipments/{id}/reverse` | Devolução |
+| GET | `/services/shipping/shipments/{id}/tracking` | Rastreio |
+| GET | `/services/shipping/shipments/{id}/label` | Etiqueta (PDF) |
+| GET | `/services/shipping/shipments/labels?ids=` | Etiquetas de vários (PDF) |
+| GET/PUT/DELETE | `/services/shipping/webhook` | Webhook da conta |
 
 ---
 
@@ -118,7 +150,21 @@ Todos os métodos do helper `orchestrator()` retornam:
 ]
 ```
 
-`success => false` com `data => []` é o retorno de **qualquer falha** — os métodos **nunca lançam exceção** para não derrubar a request (degradação graciosa). Cai nesse retorno quando:
+`success => false` com `data => []` é o retorno de **qualquer falha** — os métodos **nunca lançam exceção** para não derrubar a request (degradação graciosa). A falha traz também o que o orchestrator respondeu, para mostrar ao usuário:
+
+```php
+[
+    'success' => false,
+    'data'    => [],
+    'status'  => 422,                 // HTTP do orchestrator; null sem resposta (conexão, token ausente)
+    'message' => 'Dados inválidos.',  // mensagem do orchestrator, quando houver
+    'errors'  => ['to.postal_code' => ['O CEP deve ter 8 dígitos.']],  // erros de validação
+]
+```
+
+Status comuns: 401 chave inválida, 402 serviço fora do plano, 403 plano inativo, 404 não encontrado, 409 conflito (ex.: etiqueta ainda não pronta), 410 fonte de dados fora do ar, 422 validação, 429 limite, 503 serviço não configurado no servidor.
+
+Cai nesse retorno quando:
 
 | Situação | Comportamento | Log |
 |---|---|---|
@@ -133,7 +179,7 @@ Sempre confira `success` antes de usar `data`.
 ### Resiliência (timeouts / retry)
 
 - `connectTimeout` 5s + `timeout` 15s por tentativa — a chamada roda dentro da request web e não prende o worker.
-- **Retry só em GET** (idempotente): 2 re-tentativas em falha de rede. POST/PUT/PATCH/DELETE **não** repetem (evita duplicar checkout/etiqueta).
+- **Retry só em GET** (idempotente) e só em falha de rede: 2 tentativas no total. Resposta 4xx/5xx volta na hora. POST/PUT/PATCH/DELETE **não** repetem (evita duplicar envio/PIX); para repetir com segurança, use a chave de idempotência (ver [Frete](#frete-white-label)).
 
 ### Cache
 
@@ -141,10 +187,10 @@ Respostas de **GET com sucesso** são cacheadas por tipo de volatilidade. POST e
 
 | TTL | Endpoints |
 |---|---|
-| **30 dias** | bancos, países, estados, cidades, feriados, FIPE (marcas/modelos/anos/preço), NCM, CEP |
-| **1 dia** | CNPJ, transportadoras (`getCarriers`) |
-| **1 hora** | domínio (WHOIS) |
-| **sem cache** | CPF, clima, câmbio, ações B3, calendário e todas as operações de shipping (carrinho/checkout/etiquetas/pedidos/rastreio) |
+| **30 dias** | bancos, países, estados, cidades, feriados, FIPE (marcas/modelos/anos/preço), NCM, CEP, CNAE, código IBGE, coordenadas e distância |
+| **1 dia** | CNPJ, sócios, Simples/MEI, tributos do NCM, telefone, serviços de frete |
+| **1 hora** | domínio (WHOIS), indicadores, e-mail, agências de postagem |
+| **sem cache** | CPF, clima, câmbio, ações B3, calendário, PIX e as operações de frete (envios, pagamento, etiqueta, rastreio, remetentes, webhook) |
 
 > Em ambiente multi-tenant, o cache é isolado por tenant — cada tenant busca o dado uma vez por TTL. Com os TTLs longos, a redundância é desprezível.
 
@@ -421,436 +467,314 @@ $result['data']['act_year'];     // Ano do ato
 
 ---
 
-## Shipping — Melhor Envio
-
-### Transportadoras disponíveis
+## Empresa: sócios, Simples/MEI e CNAE
 
 ```php
-$result = orchestrator()->getCarriers();
+// Quadro de sócios e administradores (documentos mascarados pela Receita)
+$r = orchestrator()->getCnpjPartners('33.000.167/0001-01');
+$r['data']['total'];                    // 10
+$r['data']['partners'][0]['name'];      // CLARICE COPPETTI
+$r['data']['partners'][0]['document'];  // ***995240**
+$r['data']['partners'][0]['role'];      // qualificação (Diretor, Sócio-Administrador...)
 
-foreach ($result['data'] as $carrier) {
-    $carrier['id'];           // ID do serviço (use em buildOrder()->service())
-    $carrier['name'];         // Nome (ex: Correios PAC)
-    $carrier['company'];      // Transportadora
+// Opção pelo Simples Nacional e pelo MEI
+$r = orchestrator()->getCnpjSimples('33000167000101');
+$r['data']['simples'];  // ['optant' => false, 'since' => null, 'until' => null]
+$r['data']['mei'];      // idem
+
+// CNAE (aceita 1921700 ou o formato do cartão CNPJ, 1921-7/00)
+$r = orchestrator()->getCnae('1921-7/00');
+$r['data']['formatted'];    // 1921-7/00
+$r['data']['description'];  // FABRICAÇÃO DE PRODUTOS DO REFINO DE PETRÓLEO
+
+// Busca pela descrição (sem acento) ou pelo começo do código
+$r = orchestrator()->searchCnae('padaria');
+```
+
+---
+
+## Código IBGE e geolocalização
+
+```php
+// Município do CEP com o código IBGE (o que a NF-e pede)
+$r = orchestrator()->getIbgeByZipCode('13010-001');
+$r['data']['code'];         // 3509502
+$r['data']['name'];         // Campinas
+$r['data']['state']['uf'];  // SP
+
+// Municípios da UF; com nome, acha um (ignora acento, hífen e apóstrofo)
+orchestrator()->getIbgeCities('SP');
+orchestrator()->getIbgeCities('SP', "Santa Barbara d'Oeste");
+
+// Município pelo código
+orchestrator()->getIbgeCity('3509502');
+
+// Coordenadas do CEP
+$r = orchestrator()->getGeoByZipCode('01001-000');
+$r['data']['latitude'];   // -23.5496714
+$r['data']['longitude'];  // -46.6332637
+$r['data']['precision'];  // zip_code | street | city
+
+// Distância em linha reta entre dois CEPs
+$r = orchestrator()->getDistance('13010-001', '01001-000');
+```
+
+---
+
+## Indicadores econômicos e PIX
+
+```php
+// Último valor de Selic, CDI, IPCA, IPCA 12m, IGP-M, INPC e TR (Banco Central)
+$r = orchestrator()->getIndicators();
+$r['data'][0];  // ['indicator' => 'selic', 'name' => ..., 'unit' => '% a.a.', 'date' => ..., 'value' => 13.75]
+
+// Um indicador; com período (Y-m-d, até 10 anos), a série
+orchestrator()->getIndicator('ipca');
+$r = orchestrator()->getIndicator('selic', '2025-01-01', '2025-12-31');
+$r['data']['values'];  // [['date' => '2025-01-01', 'value' => 12.25], ...]
+
+// PIX copia e cola: confere o CRC e extrai os dados (não diz se foi pago)
+$r = orchestrator()->decodePix('00020126580014br.gov.bcb.pix0136...6304ABCD');
+$r['data']['valid'];     // true
+$r['data']['type'];      // static | dynamic
+$r['data']['key'];       // chave PIX
+$r['data']['key_type'];  // cpf | cnpj | email | phone | evp
+$r['data']['amount'];    // null quando o valor é livre
+```
+
+---
+
+## Tributos por NCM (IBPT)
+
+```php
+// NCM com 8 dígitos e a UF. Precisa do token do IBPT no servidor (503 sem ele).
+$r = orchestrator()->getNcmTaxes('8517.13.00', 'SP');
+```
+
+---
+
+## Validação de e-mail e telefone
+
+```php
+$r = orchestrator()->validateEmail('contato@gmial.com');
+$r['data']['valid'];         // false
+$r['data']['mx'];            // o domínio recebe e-mail?
+$r['data']['disposable'];    // e-mail descartável
+$r['data']['role_account'];  // contato@, vendas@...
+$r['data']['suggestion'];    // contato@gmail.com
+
+$r = orchestrator()->validatePhone('(21) 98765-4321');  // sem DDI, lido como brasileiro
+$r['data']['valid'];     // true
+$r['data']['type'];      // mobile | fixed_line ...
+$r['data']['e164'];      // +5521987654321
+$r['data']['national'];  // (21) 98765-4321
+```
+
+---
+
+## Catálogo da B3
+
+```php
+// Filtros: search, sector, type, sort_by, sort_order, limit e page
+$r = orchestrator()->getStocks(['search' => 'petr', 'limit' => 10]);
+$r['data']['stocks'];
+```
+
+---
+
+## Frete (white label)
+
+O cliente fala só com o orchestrator: ids próprios, preço final já com a margem e nenhum dado do provedor. O fluxo é: **cotar → criar o envio → gerar o PIX → (pago) etiqueta emitida → imprimir → rastrear**.
+
+### Serviços e cotação
+
+```php
+use RiseTechApps\OrchestratorLink\Shipping\ShippingProduct;
+use RiseTechApps\OrchestratorLink\Shipping\ShippingVolume;
+
+orchestrator()->getShippingServices();
+// [['id' => 1, 'name' => 'PAC', 'carrier' => 'Correios', 'requires_agency' => false], ...]
+
+$quote = orchestrator()->buildQuote()
+    ->from('01001-000')
+    ->to('13010-001')
+    ->addVolume(fn (ShippingVolume $v) => $v->dimensions(10, 20, 30)->weight(1.5))  // altura, largura, comprimento (cm), kg
+    // ou produtos soltos: ->addProduct(fn (ShippingProduct $p) => $p->id('sku-1')->dimensions(20, 10, 30)->weight(0.5)->quantity(2))
+    ->insurance(150.00)
+    ->services([1, 2])  // opcional: só estes serviços
+    ->send();
+```
+
+Serviço com `requires_agency` pede a agência de postagem:
+
+```php
+orchestrator()->getShippingAgencies(service: 3, postalCode: '01001-000', state: 'SP', city: 'São Paulo');
+```
+
+### Criar o envio
+
+```php
+use RiseTechApps\OrchestratorLink\Shipping\ShippingAddress;
+
+$result = orchestrator()->buildShipment()
+    ->reference('pedido-1050')          // sua referência, para achar o envio depois
+    ->service(1)
+    ->sender(fn (ShippingAddress $a) => $a
+        ->name('Loja Aurora')->phone('(21) 99999-8888')->email('loja@example.com')
+        ->companyDocument('14.779.686/0001-95')
+        ->street('Rua das Flores', '42', 'Loja 3')->district('Centro')
+        ->city('Rio de Janeiro', 'RJ')->postalCode('20040-020'))
+    // ou um remetente salvo: ->senderId(1)
+    ->recipient(fn (ShippingAddress $a) => $a
+        ->name('Maria Souza')->phone('(19) 98888-7777')->email('maria@example.com')
+        ->document('529.982.247-25')
+        ->street('Av. Dr. Moraes Salles', '100')->district('Centro')
+        ->city('Campinas', 'SP')->postalCode('13010-001'))
+    ->addVolume(fn (ShippingVolume $v) => $v
+        ->dimensions(10, 20, 30)->weight(1.5)
+        // Correios: um objeto por volume, cada um com os próprios produtos
+        ->addProduct(fn (ShippingProduct $p) => $p->name('Caneca')->quantity(2)->price(30.00)))
+    // em outras transportadoras, os produtos podem ir no envio: ->addProduct(...)
+    ->insurance(60.00)
+    // ->invoice('3525...0019')         // NF-e (44 dígitos): dispensa a declaração de conteúdo
+    // ->notifications(sender: true, recipient: false)
+    // ->labelLogo($base64Png)          // logo do remetente na etiqueta
+    ->idempotencyKey('pedido-1050')     // repetir com a mesma chave não cria outro envio
+    ->save()                            // grava a cópia local em orchestrator_shipments
+    ->create();
+
+$shipmentId = $result['data']['id'];    // UUID do envio
+$result['data']['price'];               // preço final
+$result['data']['tracking_url'];        // página pública de rastreio para o destinatário
+```
+
+### Pagamento (PIX)
+
+A etiqueta só é comprada depois que o PIX é pago.
+
+```php
+$pix = orchestrator()->purchaseShipment($shipmentId);
+$pix['data']['pix']['code'];       // copia e cola
+$pix['data']['pix']['qr_base64'];  // QR Code
+$pix['data']['expires_at'];
+
+orchestrator()->getShipmentPayment($shipmentId);  // confere no gateway
+
+// Vários envios num PIX só (até 50)
+$group = orchestrator()->payShipments([$id1, $id2]);
+orchestrator()->getShipmentPaymentGroup($group['data']['id']);
+
+// Com a chave de teste: aprova o PIX simulado e segue o fluxo no sandbox
+orchestrator()->simulateShipmentPayment($shipmentId);
+```
+
+### Etiqueta, rastreio, cancelamento e devolução
+
+```php
+// PDF (bytes em data.content)
+$label = orchestrator()->getShipmentLabel($shipmentId);
+if ($label['success']) {
+    return response($label['data']['content'], 200, ['Content-Type' => 'application/pdf']);
 }
+
+orchestrator()->getShipmentLabels([$id1, $id2]);  // um PDF com várias
+
+orchestrator()->trackShipment($shipmentId);       // sincroniza status e rastreio
+orchestrator()->getShipment($shipmentId);         // envio com o histórico
+orchestrator()->listShipments(['status' => 'posted', 'external_reference' => 'pedido-1050', 'per_page' => 20]);
+orchestrator()->listShipments(['label_code' => 'ORD-123']);  // pelo código impresso na etiqueta
+
+orchestrator()->cancelShipment($shipmentId, 'Cliente desistiu');  // se pago, o PIX é estornado
+
+// Devolução: endereços do original invertidos
+orchestrator()->reverseShipment($shipmentId, [
+    'service' => 1,
+    'volumes' => [['height' => 10, 'width' => 20, 'length' => 30, 'weight' => 1.5]],
+]);
 ```
 
----
+Status do envio: `pending`, `awaiting_payment`, `processing`, `purchased`, `label_ready`, `posted`, `delivered`, `undelivered` e `cancelled`.
 
-### Calcular Frete (Builder)
+### Remetentes salvos
 
 ```php
-use RiseTechApps\OrchestratorLink\Shipping\ShippingProduct;
-use RiseTechApps\OrchestratorLink\Shipping\ShippingVolume;
-use RiseTechApps\OrchestratorLink\Shipping\ShippingAddress;
-
-// Simples — só CEP de origem/destino
-$result = orchestrator()->buildCalculate()
-    ->from('01310100')
-    ->to('20040020')
-    ->addProduct(
-        ShippingProduct::make()
-            ->id('prod-1')           // ID interno (referência sua)
-            ->dimensions(20, 15, 30) // largura, altura, comprimento (cm)
-            ->weight(1.5)            // kg
-            ->quantity(1)
-            ->insureFor(150.00)      // valor declarado para seguro (R$)
-    )
-    ->send();
-
-// Com endereço completo no origem/destino
-$result = orchestrator()->buildCalculate()
-    ->from(
-        ShippingAddress::make()
-            ->postalCode('01310100')
-            ->city('São Paulo', 'SP')
-    )
-    ->to(
-        ShippingAddress::make()
-            ->postalCode('20040020')
-            ->city('Rio de Janeiro', 'RJ')
-    )
-    ->addProduct(
-        ShippingProduct::make()
-            ->id('p1')
-            ->dimensions(20, 15, 30)
-            ->weight(1.5)
-            ->quantity(2)
-            ->insureFor(300.00)
-    )
-    ->send();
-
-// Filtrar transportadoras específicas (ex: só Correios PAC=1 e SEDEX=2)
-$result = orchestrator()->buildCalculate()
-    ->from('01310100')
-    ->to('20040020')
-    ->addProduct(
-        ShippingProduct::make()->id('p1')->dimensions(20, 15, 30)->weight(1.5)->quantity(1)->insureFor(100)
-    )
-    ->services('1,2')
-    ->send();
-
-// Múltiplos produtos
-$result = orchestrator()->buildCalculate()
-    ->from('01310100')
-    ->to('20040020')
-    ->addProduct(ShippingProduct::make()->id('p1')->dimensions(20, 15, 30)->weight(1.5)->quantity(1)->insureFor(100))
-    ->addProduct(ShippingProduct::make()->id('p2')->dimensions(10, 10, 15)->weight(0.5)->quantity(3)->insureFor(50))
-    ->send();
-
-// Com volumes (alternativo a products para cálculo de frete)
-$result = orchestrator()->buildCalculate()
-    ->from('01310100')
-    ->to('20040020')
-    ->addVolume(
-        ShippingVolume::make()
-            ->dimensions(15, 20, 30) // altura, largura, comprimento (cm)
-            ->weight(1.5)
-    )
-    ->send();
-
-// Com opções extras
-$result = orchestrator()->buildCalculate()
-    ->from('01310100')
-    ->to('20040020')
-    ->addProduct(ShippingProduct::make()->id('p1')->dimensions(20, 15, 30)->weight(1.5)->quantity(1)->insureFor(100))
-    ->option('receipt', false)
-    ->option('own_hand', false)
-    ->send();
-
-// Múltiplas opções de uma vez
-$result = orchestrator()->buildCalculate()
-    ->from('01310100')
-    ->to('20040020')
-    ->addProduct(ShippingProduct::make()->id('p1')->dimensions(20, 15, 30)->weight(1.5)->quantity(1)->insureFor(100))
-    ->options(['receipt' => false, 'own_hand' => false])
-    ->send();
-
-// Resultado
-$serviceId = $result['data'][0]['id'];
-$price     = $result['data'][0]['price'];
-$deadline  = $result['data'][0]['custom_delivery_time']; // dias úteis
-$carrier   = $result['data'][0]['company']['name'];
+orchestrator()->getShippingSenders();
+orchestrator()->createShippingSender(ShippingAddress::make()->name('Loja')->/* ... */toArray() + ['label' => 'Loja Centro', 'is_default' => true]);
+orchestrator()->updateShippingSender(1, [...]);
+orchestrator()->deleteShippingSender(1);
 ```
 
----
+### Webhook
 
-### Adicionar ao Carrinho (Builder)
+O orchestrator avisa cada mudança de status (`shipment.payment_confirmed`, `shipment.purchased`, `shipment.label_ready`, `shipment.posted`, `shipment.delivered`, `shipment.undelivered`, `shipment.cancelled`) numa URL HTTPS pública.
 
 ```php
-use RiseTechApps\OrchestratorLink\Shipping\ShippingAddress;
-use RiseTechApps\OrchestratorLink\Shipping\ShippingProduct;
-use RiseTechApps\OrchestratorLink\Shipping\ShippingVolume;
-
-$cart = orchestrator()->buildOrder()
-    ->service(1)   // ID do serviço (vem do calculateShipping / getCarriers)
-    ->sender(
-        ShippingAddress::make()
-            ->name('Loja Example')
-            ->phone('11999990000')
-            ->email('loja@example.com.br')
-            ->document('05596752088')              // CPF (sem pontuação — normalizado automaticamente)
-            ->companyDocument('14779686000195')    // CNPJ da empresa (opcional)
-            ->street('Avenida Paulista', '1000', 'Sala 10')
-            ->district('Bela Vista')
-            ->city('São Paulo', 'SP')
-            ->postalCode('01310100')
-            ->country('BR')                        // padrão BR, pode omitir
-    )
-    ->recipient(
-        ShippingAddress::make()
-            ->name('João Silva')
-            ->phone('21988880000')
-            ->email('joao@email.com')
-            ->document('05596752088')
-            ->street('Rua das Flores', '42', 'Apto 3')
-            ->district('Centro')
-            ->city('Rio de Janeiro', 'RJ')
-            ->postalCode('20040020')
-    )
-    ->addProduct(
-        ShippingProduct::make()
-            ->name('Camiseta')
-            ->quantity(2)
-            ->price(75.00)   // valor unitário (R$)
-    )
-    ->addVolume(
-        ShippingVolume::make()
-            ->dimensions(15, 30, 40) // altura, largura, comprimento (cm)
-            ->weight(1.5)
-    )
-    ->option('insurance_value', 150.00)
-    ->option('receipt', false)
-    ->option('own_hand', false)
-    ->save()       // persiste em orchestrator_shipments (opcional)
-    ->addToCart();
-
-$orderId = $cart['data']['id']; // UUID do pedido — guarde para os próximos passos
-
-// Sem persistência local
-$cart = orchestrator()->buildOrder()
-    ->service(1)
-    ->sender(ShippingAddress::make()->name('Loja')->postalCode('01310100')->city('São Paulo', 'SP')->street('Av. Paulista', '1000')->district('Bela Vista')->phone('11999990000')->email('loja@example.com')->document('05596752088'))
-    ->recipient(ShippingAddress::make()->name('Cliente')->postalCode('20040020')->city('Rio de Janeiro', 'RJ')->street('Rua das Flores', '42')->district('Centro')->phone('21988880000')->email('cliente@example.com')->document('05596752088'))
-    ->addProduct(ShippingProduct::make()->name('Produto')->quantity(1)->price(100.00))
-    ->addVolume(ShippingVolume::make()->dimensions(10, 15, 20)->weight(1.0))
-    ->addToCart(); // sem ->save()
-
-// Múltiplos produtos e volumes
-$cart = orchestrator()->buildOrder()
-    ->service(1)
-    ->sender(/* ... */)
-    ->recipient(/* ... */)
-    ->addProduct(ShippingProduct::make()->name('Camiseta P')->quantity(1)->price(75.00))
-    ->addProduct(ShippingProduct::make()->name('Camiseta M')->quantity(2)->price(75.00))
-    ->addVolume(ShippingVolume::make()->dimensions(15, 30, 40)->weight(1.5))
-    ->addVolume(ShippingVolume::make()->dimensions(10, 20, 30)->weight(0.8))
-    ->options(['insurance_value' => 225.00, 'receipt' => false, 'own_hand' => false])
-    ->save()
-    ->addToCart();
+$r = orchestrator()->setShippingWebhook('https://minhaloja.com.br/webhooks/frete');
+$secret = $r['data']['secret'];  // mostrado só agora: guarde (ex.: no .env)
 ```
 
----
-
-### Remover do Carrinho
+Na rota que recebe:
 
 ```php
-$result = orchestrator()->removeFromCart('uuid-do-pedido');
+use RiseTechApps\OrchestratorLink\Models\Shipment;
+use RiseTechApps\OrchestratorLink\Shipping\ShippingWebhook;
+
+Route::post('/webhooks/frete', function (Request $request) {
+    if (!ShippingWebhook::verifyRequest($request, config('services.orchestrator.webhook_secret'))) {
+        abort(401);
+    }
+
+    // X-Orchestrator-Delivery identifica a entrega: use para não processar duas vezes.
+    Shipment::syncFromOrchestrator($request->input('data'));
+
+    return response()->noContent();
+});
 ```
 
----
-
-### Checkout (Pagar com saldo da carteira ME)
-
-```php
-// Pedido único
-$result = orchestrator()->checkout('uuid-do-pedido');
-
-// Múltiplos pedidos de uma vez
-$result = orchestrator()->checkout(['uuid-1', 'uuid-2', 'uuid-3']);
-```
-
-> Requer saldo na carteira do Melhor Envio. No sandbox há R$10.000 de saldo virtual.
-
----
-
-### Gerar Etiqueta
-
-```php
-// Pedido único
-$result = orchestrator()->generateLabels('uuid-do-pedido');
-
-// Múltiplos
-$result = orchestrator()->generateLabels(['uuid-1', 'uuid-2']);
-```
-
----
-
-### Imprimir / Obter URL do PDF
-
-```php
-// Link público (acessível sem login — padrão)
-$result = orchestrator()->printLabels('uuid-do-pedido');
-$result = orchestrator()->printLabels('uuid-do-pedido', 'public');
-$pdfUrl = $result['data']['url'];
-
-// Link privado (só com autenticação ME)
-$result = orchestrator()->printLabels('uuid-do-pedido', 'private');
-
-// Múltiplos pedidos
-$result = orchestrator()->printLabels(['uuid-1', 'uuid-2'], 'public');
-```
-
----
-
-### Cancelar Etiqueta
-
-```php
-// Com descrição personalizada
-$result = orchestrator()->cancelLabel(
-    id:          'uuid-do-pedido',
-    description: 'Cliente cancelou o pedido'
-);
-
-// Descrição padrão: "Cancelado via integração"
-$result = orchestrator()->cancelLabel('uuid-do-pedido');
-```
-
-> Etiquetas já postadas na transportadora não podem ser canceladas.
-
----
-
-### Listar Pedidos
-
-```php
-// Todos os pedidos (página 1)
-$result = orchestrator()->listOrders();
-
-// Filtrar por status
-$result = orchestrator()->listOrders('pending');       // Aguardando pagamento
-$result = orchestrator()->listOrders('released');      // Pagos / liberados
-$result = orchestrator()->listOrders('posted');        // Postados
-$result = orchestrator()->listOrders('delivered');     // Entregues
-$result = orchestrator()->listOrders('canceled');      // Cancelados
-$result = orchestrator()->listOrders('Not Delivered'); // Não entregues
-
-// Com paginação
-$result = orchestrator()->listOrders('posted', page: 2);
-$result = orchestrator()->listOrders(page: 3); // sem filtro, página 3
-```
-
-**Status disponíveis:** `pending` · `released` · `posted` · `delivered` · `canceled` · `Not Delivered`
-
----
-
-### Detalhes de um Pedido
-
-```php
-$result = orchestrator()->getOrder('uuid-do-pedido');
-
-$result['data']['status'];    // Status atual
-$result['data']['tracking'];  // Código de rastreio
-$result['data']['price'];     // Valor pago
-```
-
----
-
-### Pesquisar Pedido
-
-```php
-// Por código de rastreio
-$result = orchestrator()->searchOrder('ME23002OWZ7BR');
-
-// Por protocolo
-$result = orchestrator()->searchOrder('ORD-20220397305');
-
-// Por CPF/CNPJ do destinatário
-$result = orchestrator()->searchOrder('05596752088');
-
-// Por UUID do pedido
-$result = orchestrator()->searchOrder('uuid-do-pedido');
-```
-
----
-
-### Rastrear Envio
-
-```php
-// Pedido único
-$result = orchestrator()->trackShipment('uuid-do-pedido');
-
-// Múltiplos pedidos
-$result = orchestrator()->trackShipment(['uuid-1', 'uuid-2']);
-
-$result['data']['uuid-do-pedido']['status'];        // posted / delivered
-$result['data']['uuid-do-pedido']['tracking'];      // ME23002OWZ7BR
-$result['data']['uuid-do-pedido']['posted_at'];     // Data de postagem
-$result['data']['uuid-do-pedido']['delivered_at'];  // Data de entrega
-```
-
----
+Resposta fora de 2xx é reenviada até 8 vezes ao longo de ~1 dia. Avisos com mais de 5 minutos são recusados por padrão (`verify(..., tolerance: 300)`).
 
 ### Model Shipment
 
-Ao usar `->save()` no builder, o envio é persistido na tabela `orchestrator_shipments`.
+`->save()` no builder e `Shipment::syncFromOrchestrator($data)` gravam a cópia local em `orchestrator_shipments`, pelo `orchestrator_id`. Um aviso parcial não apaga o que já estava salvo.
 
 ```php
 use RiseTechApps\OrchestratorLink\Models\Shipment;
 
-// Listar todos os envios
-Shipment::all();
+$shipment = Shipment::where('orchestrator_id', $shipmentId)->first();
+Shipment::where('external_reference', 'pedido-1050')->first();
+Shipment::pending()->get();  // também posted() e delivered()
 
-// Scopes por status
-Shipment::pending()->get();
-Shipment::posted()->get();
-Shipment::delivered()->get();
+$shipment->isAwaitingPayment();
+$shipment->isLabelReady();
+$shipment->isPosted();
+$shipment->isDelivered();
+$shipment->isCanceled();
 
-// Buscar por campo
-Shipment::where('me_order_id', 'uuid')->first();
-Shipment::where('tracking_code', 'ME23002OWZ7BR')->first();
-Shipment::where('to_postal_code', '20040020')->get();
-
-// Verificar status via método
-$shipment = Shipment::find(1);
-$shipment->isPending();    // bool
-$shipment->isPosted();     // bool
-$shipment->isDelivered();  // bool
-$shipment->isCanceled();   // bool
-
-// Atualizar após rastreamento
-$shipment->update([
-    'status'        => 'delivered',
-    'tracking_code' => 'ME23002OWZ7BR',
-    'delivered_at'  => now(),
-]);
-
-// Atualizar URL da etiqueta após gerar
-$shipment->update(['label_url' => $pdfUrl]);
-
-// Colunas disponíveis
-// me_order_id, me_protocol, service_id, service_name, status, tracking_code,
-// from_postal_code, from_data (json), to_postal_code, to_data (json),
-// products (json), volumes (json), options (json), price, label_url,
-// posted_at, delivered_at, canceled_at, created_at, updated_at
+// Colunas: orchestrator_id, external_reference, service_id, service_name, carrier,
+// status, sandbox, tracking_code, tracking_url, from_postal_code, from_data (json),
+// to_postal_code, to_data (json), products (json), volumes (json), options (json),
+// price, paid_at, posted_at, delivered_at, canceled_at. As colunas me_* e
+// label_url são dos envios criados antes da 3.0.
 ```
 
----
+### Atualizando da 2.x
 
-### Fluxo Completo de Envio
+A 2.x falava com as rotas do Melhor Envio, que o orchestrator 4.0 removeu: na prática o frete da 2.x já não funciona.
 
-```php
-use RiseTechApps\OrchestratorLink\Shipping\ShippingAddress;
-use RiseTechApps\OrchestratorLink\Shipping\ShippingProduct;
-use RiseTechApps\OrchestratorLink\Shipping\ShippingVolume;
+| 2.x | 3.0 |
+|---|---|
+| `getCarriers()` | `getShippingServices()` |
+| `buildCalculate()` / `calculateShipping()` | `buildQuote()` / `quoteShipping()` |
+| `buildOrder()->addToCart()` / `addToCart()` | `buildShipment()->create()` / `createShipment()` |
+| `checkout()` (saldo da carteira) | `purchaseShipment()` / `payShipments()` (PIX) |
+| `generateLabels()` | automático depois do pagamento |
+| `printLabels()` (URL) | `getShipmentLabel()` / `getShipmentLabels()` (PDF) |
+| `cancelLabel()` | `cancelShipment()` |
+| `listOrders()` / `getOrder()` / `searchOrder()` | `listShipments()` / `getShipment()` |
+| `trackShipment(array)` | `trackShipment(string $id)` |
+| `removeFromCart()` | `cancelShipment()` |
 
-// 1. Calcular fretes disponíveis
-$calc = orchestrator()->buildCalculate()
-    ->from('01310100')
-    ->to('20040020')
-    ->addProduct(
-        ShippingProduct::make()->id('p1')->dimensions(20, 15, 30)->weight(1.5)->quantity(1)->insureFor(75)
-    )
-    ->send();
-
-$serviceId = $calc['data'][0]['id'];  // serviço mais barato
-
-// 2. Adicionar ao carrinho
-$cart = orchestrator()->buildOrder()
-    ->service($serviceId)
-    ->sender(
-        ShippingAddress::make()
-            ->name('Loja Example')->phone('11999990000')->email('loja@example.com.br')
-            ->document('14779686000195')->street('Av. Paulista', '1000')
-            ->district('Bela Vista')->city('São Paulo', 'SP')->postalCode('01310100')
-    )
-    ->recipient(
-        ShippingAddress::make()
-            ->name('João Silva')->phone('21988880000')->email('joao@email.com')
-            ->document('05596752088')->street('Rua das Flores', '42', 'Apto 3')
-            ->district('Centro')->city('Rio de Janeiro', 'RJ')->postalCode('20040020')
-    )
-    ->addProduct(ShippingProduct::make()->name('Camiseta')->quantity(1)->price(75.00))
-    ->addVolume(ShippingVolume::make()->dimensions(15, 30, 40)->weight(1.5))
-    ->option('insurance_value', 75.00)
-    ->save()
-    ->addToCart();
-
-$orderId = $cart['data']['id'];
-
-// 3. Pagar (checkout com saldo da carteira ME)
-orchestrator()->checkout($orderId);
-
-// 4. Gerar etiqueta
-orchestrator()->generateLabels($orderId);
-
-// 5. Obter URL do PDF
-$print  = orchestrator()->printLabels($orderId, 'public');
-$pdfUrl = $print['data']['url'];
-
-// 6. Rastrear
-$track  = orchestrator()->trackShipment($orderId);
-$status = $track['data'][$orderId]['status'];
-```
+Rode `php artisan migrate`: a migration nova acrescenta as colunas do envio novo em `orchestrator_shipments`.
 
 ---
 
@@ -879,25 +803,44 @@ $status = $track['data'][$orderId]['status'];
 | `getStock($symbol)` | Cotação de ação B3 ou índice |
 | `getNcm($code)` | NCM por código (8 dígitos) |
 | `searchNcm($term)` | NCM por descrição |
-| `getCarriers()` | Transportadoras disponíveis no Melhor Envio |
-| `buildCalculate()` | Builder fluente para cálculo de frete |
-| `buildOrder()` | Builder fluente para criação de pedido |
-| `addToCart($data)` | Adicionar ao carrinho (raw, sem builder) |
-| `removeFromCart($id)` | Remover do carrinho |
-| `checkout($orderIds)` | Pagar fretes (string ou array) |
-| `generateLabels($orderIds)` | Gerar etiquetas (string ou array) |
-| `printLabels($orderIds, $mode?)` | URL do PDF da etiqueta (`public`/`private`) |
-| `cancelLabel($id, $description?)` | Cancelar etiqueta |
-| `listOrders($status?, $page?)` | Listar pedidos com filtro e paginação |
-| `getOrder($id)` | Detalhes de um pedido |
-| `searchOrder($query)` | Pesquisar pedido por rastreio, protocolo, CPF/CNPJ ou ID |
-| `trackShipment($orderIds)` | Rastrear envio (string ou array) |
+| `getStocks($filters?)` | Catálogo de ativos da B3 |
+| `getCnpjPartners($cnpj)` | Sócios do CNPJ (QSA) |
+| `getCnpjSimples($cnpj)` | Simples Nacional e MEI |
+| `getCnae($code)` | CNAE por código |
+| `searchCnae($term)` | Busca CNAE |
+| `getIbgeCities($uf, $name?)` | Municípios da UF com código IBGE |
+| `getIbgeCity($code)` | Município pelo código IBGE |
+| `getIbgeByZipCode($cep)` | Código IBGE do CEP |
+| `getGeoByZipCode($cep)` | Coordenadas do CEP |
+| `getDistance($from, $to)` | Distância entre CEPs |
+| `getIndicators()` | Indicadores econômicos (último valor) |
+| `getIndicator($indicator, $from?, $to?)` | Um indicador ou a série |
+| `decodePix($code)` | Lê PIX copia e cola |
+| `getNcmTaxes($code, $uf)` | Tributos do NCM (IBPT) |
+| `validateEmail($email)` | Validação de e-mail |
+| `validatePhone($phone)` | Validação de telefone |
+| `getShippingServices()` | Serviços de entrega |
+| `buildQuote()` / `quoteShipping($data)` | Cotação |
+| `getShippingAgencies($service, $postalCode, $state, $city, $district?)` | Agências de postagem |
+| `getShippingSenders()` / `createShippingSender($data)` / `updateShippingSender($id, $data)` / `deleteShippingSender($id)` | Remetentes salvos |
+| `buildShipment()` / `createShipment($data, $idempotencyKey?)` | Cria envio |
+| `listShipments($filters?)` | Lista envios |
+| `getShipment($id)` | Envio com histórico |
+| `purchaseShipment($id, $idempotencyKey?)` | Gera o PIX |
+| `getShipmentPayment($id)` | Pagamento do envio |
+| `payShipments($ids, $idempotencyKey?)` / `getShipmentPaymentGroup($group)` | PIX de vários envios |
+| `simulateShipmentPayment($id)` | Simula pagamento (chave de teste) |
+| `cancelShipment($id, $reason?)` | Cancela (estorna se pago) |
+| `reverseShipment($id, $data, $idempotencyKey?)` | Devolução |
+| `trackShipment($id)` | Sincroniza rastreio |
+| `getShipmentLabel($id)` / `getShipmentLabels($ids)` | Etiqueta em PDF |
+| `getShippingWebhook()` / `setShippingWebhook($url)` / `deleteShippingWebhook()` | Webhook da conta |
 
 ---
 
 ## Requisitos
 
-- PHP >= 8.3
+- PHP >= 8.4
 - Laravel >= 12
 
 ---

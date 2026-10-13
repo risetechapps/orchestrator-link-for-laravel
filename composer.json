@@ -1,6 +1,6 @@
 {
     "name": "risetechapps/orchestrator-link-for-laravel",
-    "description": "",
+    "description": "Cliente Laravel da API Orchestrator da RiseTech.",
     "keywords": [
         "risetechapps",
         "service",
@@ -28,6 +28,7 @@
         "laravel/sail": "^1.41",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.6",
+        "orchestra/testbench": "^10.0",
         "pestphp/pest": "^4.1",
         "pestphp/pest-plugin-laravel": "^4.0"
     },
@@ -36,7 +37,7 @@
             "RiseTechApps\\OrchestratorLink\\": "src"
         },
         "files": [
-            "/src/helpers.php"
+            "src/helpers.php"
         ]
     },
     "autoload-dev": {
@@ -45,11 +46,14 @@
         }
     },
     "scripts": {
-        "test": "vendor/bin/phpunit",
-        "test-coverage": "vendor/bin/phpunit --coverage-html coverage"
+        "test": "vendor/bin/pest",
+        "test-coverage": "vendor/bin/pest --coverage"
     },
     "config": {
-        "sort-packages": true
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
     },
     "extra": {
         "laravel": {
@@ -57,11 +61,11 @@
                 "RiseTechApps\\OrchestratorLink\\OrchestratorLinkServiceProvider"
             ],
             "aliases": {
-                "OrchestratorLink":  "RiseTechApps\\OrchestratorLink\\OrchestratorLinkFacade"
+                "OrchestratorLink": "RiseTechApps\\OrchestratorLink\\OrchestratorLinkFacade"
             }
         }
     },
     "minimum-stability": "stable",
     "prefer-stable": true,
-    "version": "2.0.0"
+    "version": "3.0.0"
 }

@@ -11,14 +11,14 @@ class ShippingProduct
         return new self();
     }
 
-    // Para calculateShipping (identifica o produto internamente)
+    // Para a cotação (identifica o produto internamente)
     public function id(string $id): self
     {
         $this->data['id'] = $id;
         return $this;
     }
 
-    // Para addToCart
+    // Para o envio (declaração de conteúdo)
     public function name(string $name): self
     {
         $this->data['name'] = $name;
@@ -46,14 +46,14 @@ class ShippingProduct
         return $this;
     }
 
-    // Valor para seguro (calculateShipping)
+    // Valor para seguro (cotação)
     public function insureFor(float $value): self
     {
         $this->data['insurance_value'] = $value;
         return $this;
     }
 
-    // Valor unitário (addToCart)
+    // Valor unitário (envio)
     public function price(float $value): self
     {
         $this->data['unitary_value'] = $value;
@@ -63,5 +63,11 @@ class ShippingProduct
     public function toArray(): array
     {
         return $this->data;
+    }
+
+    // Só o que a declaração de conteúdo do envio pede: nome, quantidade e valor unitário
+    public function toDeclaration(): array
+    {
+        return array_intersect_key($this->data, array_flip(['name', 'quantity', 'unitary_value']));
     }
 }
