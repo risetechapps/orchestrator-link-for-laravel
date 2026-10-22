@@ -1,0 +1,15 @@
+# Changelog
+
+Todas as alterações notáveis neste projeto serão documentadas neste arquivo.
+O formato é baseado em [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), e este projeto segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (SemVer).
+
+## [1.0.0] - 2026-10-22
+
+Primeira versão pública. As versões anteriores foram de teste.
+
+- Cliente da API Orchestrator pelo helper `orchestrator()`: CPF, CNPJ (inclusive alfanumérico), sócios, Simples/MEI, CNAE, CEP, código IBGE, geolocalização e distância, bancos, países, estados, cidades, feriados, clima, calendário, WHOIS, FIPE, câmbio, ações e catálogo da B3, indicadores do Banco Central, leitura de PIX copia e cola, NCM com tributos do IBPT e validação de e-mail e telefone.
+- Frete white label: serviços, cotação (`buildQuote`), agências de postagem, remetentes salvos, criação do envio (`buildShipment`) com chave de idempotência, PIX por envio e para vários envios, pagamento simulado com a chave de teste, cancelamento com estorno, devolução, rastreio, lista com filtros e etiqueta em PDF.
+- `ShippingWebhook::verify()` / `verifyRequest()` conferem a assinatura dos avisos de frete.
+- Model `Shipment` com a cópia local dos envios (`syncFromOrchestrator`) e a migration `orchestrator_shipments`.
+- Rotas proxy opcionais (`OrchestratorLink::routes()`), que repassam o status HTTP do orchestrator (502 quando ele não responde).
+- Falhas nunca lançam exceção: voltam como `success: false` com `status`, `message` e `errors` do orchestrator. GET repete só falha de conexão; consultas de referência ficam em cache.
