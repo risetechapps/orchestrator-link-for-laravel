@@ -622,7 +622,7 @@ $result = orchestrator()->buildShipment()
     ->service(1)
     ->sender(fn (ShippingAddress $a) => $a
         ->name('Loja Aurora')->phone('(21) 99999-8888')->email('loja@example.com')
-        ->companyDocument('14.779.686/0001-95')
+        ->companyDocument('14.779.686/0001-95')   // CNPJ alfanumérico também: '12.ABC.345/01DE-35'
         ->street('Rua das Flores', '42', 'Loja 3')->district('Centro')
         ->city('Rio de Janeiro', 'RJ')->postalCode('20040-020'))
     // ou um remetente salvo: ->senderId(1)

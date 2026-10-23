@@ -3,6 +3,12 @@
 Todas as alterações notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), e este projeto segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (SemVer).
 
+## [1.0.1] - 2026-10-22
+
+### Corrigido
+
+- Frete: `ShippingAddress::document()` e `companyDocument()` mantêm as letras do CNPJ alfanumérico. Antes tiravam tudo o que não fosse dígito (`12.ABC.345/01DE-35` virava `123450135`), e a criação do envio voltava 422.
+
 ## [1.0.0] - 2026-10-22
 
 Primeira versão pública. As versões anteriores foram de teste.

@@ -135,6 +135,14 @@ it('envio pelo builder: endereços, produtos por volume, NF-e e chave de idempot
     });
 });
 
+it('mantém as letras do CNPJ alfanumérico no documento do remetente e do destinatário', function () {
+    $address = address('Empresa', '01001-000')->document('12.abc.345/01de-35')->companyDocument('12.ABC.345/01DE-35')->toArray();
+
+    expect($address['document'])->toBe('12ABC34501DE35')
+        ->and($address['company_document'])->toBe('12ABC34501DE35')
+        ->and(address('Pessoa', '01001-000')->toArray()['document'])->toBe('12345678909');
+});
+
 it('remetente salvo substitui o endereço do remetente, e vice-versa', function () {
     $builder = orchestrator()->buildShipment()->sender(address('Loja', '01001000'))->senderId(7);
     expect($builder->toArray())->toBe(['sender_id' => 7]);

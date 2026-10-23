@@ -31,14 +31,23 @@ class ShippingAddress
 
     public function document(string $document): self
     {
-        $this->data['document'] = preg_replace('/\D/', '', $document);
+        $this->data['document'] = static::normalizeDocument($document);
         return $this;
     }
 
     public function companyDocument(string $document): self
     {
-        $this->data['company_document'] = preg_replace('/\D/', '', $document);
+        $this->data['company_document'] = static::normalizeDocument($document);
         return $this;
+    }
+
+    /**
+     * Tira a pontuação e mantém as letras do CNPJ alfanumérico (Receita, 2026).
+     * Com `\D`, "12.ABC.345/01DE-35" virava "123450135" e o envio voltava 422.
+     */
+    protected static function normalizeDocument(string $document): string
+    {
+        return preg_replace('/[^0-9A-Z]/', '', strtoupper($document));
     }
 
     public function street(string $address, string $number, string $complement = ''): self
