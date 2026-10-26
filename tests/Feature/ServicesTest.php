@@ -35,7 +35,7 @@ it('chama a rota do orchestrator', function (Closure $call, string $path) {
 
     $result = $call();
 
-    expect($result)->toBe(['success' => true, 'data' => ['ok' => true]]);
+    expect($result)->toBe(['success' => true, 'data' => ['ok' => true], 'status' => 200, 'message' => null]);
     Http::assertSent(fn (Request $request) => $request->method() === 'GET'
         && $request->url() === BASE . $path
         && $request->header('X-API-KEY') === ['test-key']);
@@ -69,3 +69,18 @@ it('não guarda falha em cache', function () {
     expect(orchestrator()->getIndicators()['success'])->toBeFalse()
         ->and(orchestrator()->getIndicators()['data'])->toBe(['selic' => 15]);
 });
+
+dataset('path segments', [
+    'cidade com barra'  => [fn () => orchestrator()->getWeather('Santa Rita/Norte', 'BR', 'SP'), '/weather/Santa%20Rita%2FNorte/BR/SP'],
+    'cidade com acento' => [fn () => orchestrator()->getWeather('São Paulo', 'BR'), '/weather/S%C3%A3o%20Paulo/BR'],
+    'marca FIPE com ?'  => [fn () => orchestrator()->getFipeModels('cars', '21?x'), '/fipe/cars/21%3Fx/models'],
+    'id do envio'       => [fn () => orchestrator()->getShipment('a#b'), '/shipping/shipments/a%23b'],
+]);
+
+it('codifica os valores que vão no caminho', function (Closure $call, string $path) {
+    Http::fake(['*' => ok()]);
+
+    $call();
+
+    Http::assertSent(fn (Request $request) => $request->url() === BASE . $path);
+})->with('path segments');

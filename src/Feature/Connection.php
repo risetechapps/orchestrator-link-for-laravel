@@ -21,6 +21,15 @@ abstract class Connection
     public const int TTL_HOUR   = 3600;    // 1 hora — muda com frequência (domínio)
 
     /**
+     * Erros da conta que integra o orchestrator (chave inválida, plano, cota),
+     * não do usuário final da app: o detalhe vai só para o log, e a resposta
+     * vira um 503 genérico.
+     */
+    public const array ACCOUNT_ERROR_STATUSES = [401, 402, 403, 429];
+
+    public const string UNAVAILABLE_MESSAGE = 'This service is temporarily unavailable. Please try again later.';
+
+    /**
      * @param int   $cacheTtl Segundos de cache. 0 = sem cache. Só tem efeito em GET.
      * @param array $headers  Headers extras (ex.: Idempotency-Key).
      */
@@ -190,17 +199,28 @@ abstract class Connection
     {
         // Distingue os tipos de falha HTTP:
         //  - 5xx → orchestrator quebrado (error, digno de alerta);
-        //  - 4xx → auth (401), plano (402/403), validação (422), rate limit (429)... (warning).
-        $status = $response->status();
+        //  - 401/402/403 e cota esgotada (REQUEST_LIMIT_REACHED) → chave, plano
+        //    ou cota da conta (error: precisa de ação, e o usuário final só vê
+        //    a mensagem genérica);
+        //  - demais 4xx → validação (422), não encontrado (404), limite por
+        //    minuto (429 RATE_LIMITED)... (warning).
+        // `error_code` é o identificador estável dos erros da conta
+        // (PLAN_EXPIRED, INVALID_API_KEY...); o texto de `message` pode mudar.
+        $status    = $response->status();
+        $errorCode = $response->json('error_code');
+        $errorCode = is_string($errorCode) ? $errorCode : null;
+
+        $isAccountProblem = in_array($status, [401, 402, 403], true) || $errorCode === 'REQUEST_LIMIT_REACHED';
 
         logger()->log(
-            $status >= 500 ? 'error' : 'warning',
+            $status >= 500 || $isAccountProblem ? 'error' : 'warning',
             '[orchestrator-link] Resposta de erro do orchestrator',
             [
-                'method' => $method,
-                'url'    => $url,
-                'status' => $status,
-                'body'   => substr((string) $response->body(), 0, 500),
+                'method'     => $method,
+                'url'        => $url,
+                'status'     => $status,
+                'error_code' => $errorCode,
+                'body'       => substr((string) $response->body(), 0, 500),
             ]
         );
     }
@@ -208,21 +228,38 @@ abstract class Connection
     /**
      * Falha. Quando o orchestrator respondeu, vêm junto o status HTTP, a
      * mensagem dele e os erros de validação (422), para a app mostrar ao
-     * usuário; sem resposta (conexão, chave ausente), `status` é null.
+     * usuário; sem resposta (conexão, chave ausente), `status` é null e a
+     * mensagem é a genérica. Erros da conta (ACCOUNT_ERROR_STATUSES) viram
+     * 503 com a mensagem genérica — o original fica no log. No 429,
+     * `retry_after` diz em quantos segundos tentar de novo.
      */
     private static function errorResponse(?Response $response = null): array
     {
         $body = $response?->json();
         $body = is_array($body) ? $body : [];
 
+        $retryAfter = static::retryAfter($response, $body);
+
+        if ($response === null || in_array($response->status(), self::ACCOUNT_ERROR_STATUSES, true)) {
+            return [
+                'success'     => false,
+                'data'        => [],
+                'status'      => $response === null ? null : 503,
+                'message'     => self::UNAVAILABLE_MESSAGE,
+                'errors'      => [],
+                'retry_after' => $retryAfter,
+            ];
+        }
+
         $errors = $body['errors'] ?? $body['data'] ?? [];
 
         return [
-            'success' => false,
-            'data'    => [],
-            'status'  => $response?->status(),
-            'message' => is_string($body['message'] ?? null) ? $body['message'] : null,
-            'errors'  => is_array($errors) ? $errors : [],
+            'success'     => false,
+            'data'        => [],
+            'status'      => $response->status(),
+            'message'     => static::message($body),
+            'errors'      => is_array($errors) ? $errors : [],
+            'retry_after' => $retryAfter,
         ];
     }
 
@@ -231,11 +268,28 @@ abstract class Connection
         // json() vira null se o corpo não for JSON válido; sem o ?? [] o acesso
         // a offset em null lançaria TypeError. As chaves também podem faltar num
         // corpo com shape inesperado — daí o fallback por chave.
-        $_response = $response->json() ?? [];
+        $_response = $response->json();
+        $_response = is_array($_response) ? $_response : [];
 
+        // `status` repassa o 201 das criações; `message` traz avisos como o do
+        // secret do webhook, que só aparece uma vez.
         return [
             'success' => $_response['success'] ?? false,
             'data'    => $_response['data'] ?? [],
+            'status'  => $response->status(),
+            'message' => static::message($_response),
         ];
+    }
+
+    private static function message(array $body): ?string
+    {
+        return is_string($body['message'] ?? null) && $body['message'] !== '' ? $body['message'] : null;
+    }
+
+    private static function retryAfter(?Response $response, array $body): ?int
+    {
+        $value = $response?->header('Retry-After') ?: ($body['retry_after'] ?? null);
+
+        return is_numeric($value) ? (int) $value : null;
     }
 }

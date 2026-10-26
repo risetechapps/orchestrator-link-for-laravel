@@ -3,6 +3,8 @@
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use RiseTechApps\OrchestratorLink\Feature\Connection;
 
 // Conexão: endereço configurável, erros com a mensagem do orchestrator,
 // retry só de falha de transporte e download do PDF.
@@ -38,6 +40,7 @@ it('na falha, devolve status, mensagem e erros de validação do orchestrator', 
         'status'  => 422,
         'message' => 'Dados inválidos.',
         'errors'  => ['to.postal_code' => ['O CEP deve ter 8 dígitos.']],
+        'retry_after' => null,
     ]);
 });
 
@@ -117,3 +120,75 @@ it('etiqueta que ainda não existe volta como falha com a mensagem', function ()
         'success' => false, 'status' => 409, 'message' => 'A etiqueta ainda não está pronta.',
     ]);
 });
+
+it('no sucesso, devolve o status HTTP e a mensagem do orchestrator', function () {
+    Http::fake(['*' => Http::response([
+        'success' => true, 'code' => 200,
+        'message' => 'Webhook configurado. Guarde o segredo: ele não será exibido novamente.',
+        'data'    => ['url' => 'https://loja.test/hook', 'active' => true, 'secret' => 'whsec_1'],
+    ])]);
+
+    expect(orchestrator()->setShippingWebhook('https://loja.test/hook'))->toMatchArray([
+        'success' => true,
+        'status'  => 200,
+        'message' => 'Webhook configurado. Guarde o segredo: ele não será exibido novamente.',
+    ]);
+});
+
+it('erro da conta vira 503 com a mensagem genérica, e o original vai só para o log', function (int $status, array $body, string $level) {
+    Log::spy();
+    Http::fake(['*' => Http::response($body, $status)]);
+
+    expect(orchestrator()->getCNPJ('33000167000101'))->toBe([
+        'success'     => false,
+        'data'        => [],
+        'status'      => 503,
+        'message'     => Connection::UNAVAILABLE_MESSAGE,
+        'errors'      => [],
+        'retry_after' => $body['retry_after'] ?? null,
+    ]);
+
+    Log::shouldHaveReceived('log')->withArgs(fn ($logLevel, $message, $context) => $logLevel === $level
+        && $context['status'] === $status
+        && $context['error_code'] === $body['error_code']
+        && json_decode($context['body'], true) === $body);
+})->with([
+    '401 sem chave'      => [401, ['success' => false, 'message' => 'API key is missing. Send it in the X-API-KEY header.', 'error_code' => 'MISSING_API_KEY'], 'error'],
+    '401 chave inválida' => [401, ['success' => false, 'message' => 'Invalid API key.', 'error_code' => 'INVALID_API_KEY'], 'error'],
+    '402 fora do plano'  => [402, ['success' => false, 'message' => 'Your plan does not include any of these features: orchestrator-cnpj.', 'error_code' => 'FEATURE_NOT_IN_PLAN', 'features' => ['orchestrator-cnpj']], 'error'],
+    '403 plano inativo'  => [403, ['success' => false, 'message' => 'Your plan has expired or is not active.', 'error_code' => 'PLAN_INACTIVE'], 'error'],
+    '403 chave de teste' => [403, ['success' => false, 'message' => 'The test key only works for shipping. Use the production key for the other services.', 'error_code' => 'API_KEY_SCOPE_DENIED'], 'error'],
+    '429 por minuto'     => [429, ['success' => false, 'message' => 'Too many requests per minute. Please wait and try again.', 'error_code' => 'RATE_LIMITED', 'retry_after' => 30], 'warning'],
+    '429 cota esgotada'  => [429, ['success' => false, 'message' => 'Request limit reached for the current billing period.', 'error_code' => 'REQUEST_LIMIT_REACHED'], 'error'],
+]);
+
+it('404 da consulta mantém o status e a mensagem do orchestrator', function () {
+    Http::fake(['*' => Http::response(['success' => false, 'code' => 404, 'message' => 'Domain not found.'], 404)]);
+
+    expect(orchestrator()->getDomain('naoexiste.com.br'))->toMatchArray(['status' => 404, 'message' => 'Domain not found.']);
+});
+
+it('sem resposta do orchestrator, a mensagem também é a genérica', function () {
+    Http::fake(fn () => throw new ConnectionException('timeout'));
+
+    expect(orchestrator()->getBanks())->toMatchArray(['status' => null, 'message' => Connection::UNAVAILABLE_MESSAGE]);
+});
+
+it('no 429, devolve o retry_after do header', function () {
+    Http::fake(['*' => Http::response(RATE_LIMITED_BODY, 429, ['Retry-After' => '25'])]);
+
+    expect(orchestrator()->getBanks())->toMatchArray(['status' => 503, 'message' => Connection::UNAVAILABLE_MESSAGE, 'retry_after' => 25]);
+});
+
+it('no 429 sem header, usa o retry_after do corpo', function () {
+    Http::fake(['*' => Http::response(RATE_LIMITED_BODY, 429)]);
+
+    expect(orchestrator()->getBanks()['retry_after'])->toBe(30);
+});
+
+const RATE_LIMITED_BODY = [
+    'success'     => false,
+    'message'     => 'Too many requests per minute. Please wait and try again.',
+    'error_code'  => 'RATE_LIMITED',
+    'retry_after' => 30,
+];

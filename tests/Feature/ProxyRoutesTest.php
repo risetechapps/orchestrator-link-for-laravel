@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use RiseTechApps\OrchestratorLink\Feature\Connection;
 use RiseTechApps\OrchestratorLink\OrchestratorLink;
 
 // Rotas proxy (OrchestratorLink::routes()): repassam ao orchestrator e
@@ -14,14 +15,15 @@ beforeEach(function () {
 it('repassa as consultas novas', function (string $uri, string $path) {
     Http::fake(['*' => ok(['ok' => true])]);
 
-    $this->getJson($uri)->assertOk()->assertExactJson(['success' => true, 'data' => ['ok' => true]]);
+    $this->getJson($uri)->assertOk()->assertExactJson(['success' => true, 'data' => ['ok' => true], 'status' => 200, 'message' => null]);
 
     Http::assertSent(fn (Request $request) => $request->url() === BASE . $path);
 })->with([
     'CNAE com barra'   => ['/services/cnae/1921-7/00', '/cnae/1921700'],
     'e-mail com @'     => ['/services/email/joao@gmail.com', '/email/joao%40gmail.com'],
     'tributos do NCM'  => ['/services/ncm/85171300/taxes?uf=sp', '/ncm/85171300/taxes?uf=SP'],
-    'busca de NCM'     => ['/services/ncm/search?search=celular', '/ncm?search=celular'],
+    'busca de NCM'     => ['/services/ncm?search=celular', '/ncm?search=celular'],
+    'busca de NCM (antiga)' => ['/services/ncm/search?search=celular', '/ncm?search=celular'],
     'município'        => ['/services/ibge/cities/SP?name=Campinas', '/ibge/cities/SP?name=Campinas'],
     'série'            => ['/services/indicators/selic?from=2025-01-01', '/indicators/selic?from=2025-01-01'],
     'sócios'           => ['/services/cnpj/33000167000101/partners', '/cnpj/33000167000101/partners'],
@@ -31,7 +33,7 @@ it('repassa as consultas novas', function (string $uri, string $path) {
 it('repassa a chave de idempotência na criação do envio', function () {
     Http::fake(['*' => ok(['id' => SHIPMENT_ID_PROXY], 201)]);
 
-    $this->postJson('/services/shipping/shipments', ['service' => 1], ['Idempotency-Key' => 'k-1'])->assertOk();
+    $this->postJson('/services/shipping/shipments', ['service' => 1], ['Idempotency-Key' => 'k-1'])->assertCreated();
 
     Http::assertSent(fn (Request $request) => $request->header('Idempotency-Key') === ['k-1'] && $request->data() === ['service' => 1]);
 });
@@ -63,6 +65,25 @@ it('responde 502 quando o orchestrator não responde', function () {
     Http::fake(['*' => fn () => throw new \Illuminate\Http\Client\ConnectionException('timeout')]);
 
     $this->getJson('/services/banks')->assertStatus(502)->assertJson(['success' => false, 'status' => null]);
+});
+
+it('erro da conta responde 503 genérico, sem a mensagem do orchestrator', function () {
+    Http::fake(['*' => Http::response(['success' => false, 'message' => 'Your plan has expired or is not active.', 'error_code' => 'PLAN_EXPIRED'], 403)]);
+
+    $this->getJson('/services/banks')
+        ->assertStatus(503)
+        ->assertJson(['success' => false, 'status' => 503, 'message' => Connection::UNAVAILABLE_MESSAGE])
+        ->assertDontSee('plan')
+        ->assertDontSee('PLAN_EXPIRED');
+});
+
+it('no 429 responde 503 genérico e repassa o Retry-After', function () {
+    Http::fake(['*' => Http::response(['success' => false, 'message' => 'Too many requests per minute. Please wait and try again.', 'error_code' => 'RATE_LIMITED', 'retry_after' => 30], 429, ['Retry-After' => '30'])]);
+
+    $this->getJson('/services/banks')
+        ->assertStatus(503)
+        ->assertHeader('Retry-After', '30')
+        ->assertJson(['success' => false, 'message' => Connection::UNAVAILABLE_MESSAGE, 'retry_after' => 30]);
 });
 
 const SHIPMENT_ID_PROXY = '0c3f8a1e-2b4d-4c6e-8f0a-1b2c3d4e5f60';

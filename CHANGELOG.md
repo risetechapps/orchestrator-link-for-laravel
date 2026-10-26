@@ -3,6 +3,21 @@
 Todas as alterações notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), e este projeto segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (SemVer).
 
+## [Não lançado]
+
+### Adicionado
+
+- O retorno de sucesso traz `status` (HTTP do orchestrator) e `message`. A mensagem carrega avisos como o do `secret` do webhook, que só aparece uma vez.
+- Falhas trazem `retry_after` (segundos) no 429, lido do header `Retry-After` ou do corpo.
+- Erros da conta no orchestrator (401, 402, 403, 429) não expõem a mensagem original ao usuário final (ex.: "Seu plano expirou"): voltam com `status` 503 e a mensagem genérica `Connection::UNAVAILABLE_MESSAGE`, em inglês. O status, o `error_code` e o corpo originais ficam no log, como `error` em 401/402/403 e na cota esgotada (`REQUEST_LIMIT_REACHED`). Sem resposta do orchestrator, a mesma mensagem genérica no lugar de `null`.
+- Rota proxy `GET /services/ncm?search=`, o caminho do OpenAPI. `/services/ncm/search` continua respondendo.
+
+### Corrigido
+
+- As rotas proxy respondem 201 nas criações (envio, remetente, PIX, devolução), como o orchestrator, em vez de 200, e repassam o header `Retry-After` no 429.
+- Valores de texto que vão no caminho (cidade, estado, país, domínio, marca/modelo/ano FIPE, símbolo, indicador, id do envio) são codificados com `rawurlencode`. Uma `/`, `?` ou `#` no valor mudava a rota chamada.
+- README: país do calendário em ISO3 (`BRA`), campos do clima e do WHOIS conforme a API, e telefone de outros países com `+DDI`.
+
 ## [1.0.1] - 2026-10-22
 
 ### Corrigido

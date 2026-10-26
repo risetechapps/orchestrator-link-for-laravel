@@ -69,7 +69,7 @@ Para expor os endpoints como proxy na sua aplicação:
 
 > As rotas usam a chave da **sua** conta no orchestrator. Coloque-as atrás da autenticação da sua app (`Route::middleware('auth')->group(...)`): sem isso, qualquer visitante consulta com a sua cota e, no frete, vê e cria envios da conta.
 
-As rotas respondem com o status HTTP do orchestrator: o corpo de erro (`success: false`, `status`, `message`, `errors`) vem com 422, 404, 409 etc., e com **502** quando o orchestrator não respondeu (fora do ar ou `ORCHESTRATOR_TOKEN` ausente).
+As rotas respondem com o status HTTP do orchestrator: 201 nas criações (envio, remetente, PIX, devolução), o corpo de erro (`success: false`, `status`, `message`, `errors`) com 422, 404, 409 etc., e **502** quando o orchestrator não respondeu (fora do ar ou `ORCHESTRATOR_TOKEN` ausente). Erros da sua conta no orchestrator (401, 402, 403, 429) respondem **503** com a mensagem genérica (veja abaixo); no 429, o header `Retry-After` é repassado.
 
 Isso registra as rotas abaixo no seu app:
 
@@ -107,7 +107,7 @@ Isso registra as rotas abaixo no seu app:
 | GET | `/services/indicators` | Indicadores econômicos |
 | GET | `/services/indicators/{indicator}?from=&to=` | Um indicador / série |
 | POST | `/services/pix/decode` | PIX copia e cola |
-| GET | `/services/ncm/search` | NCM por descrição |
+| GET | `/services/ncm?search=` | NCM por descrição (`/services/ncm/search` também responde) |
 | GET | `/services/ncm/{code}` | NCM por código |
 | GET | `/services/ncm/{code}/taxes?uf=` | Tributos do NCM (IBPT) |
 | GET | `/services/email/{email}` | Validação de e-mail |
@@ -141,8 +141,12 @@ Todos os métodos do helper `orchestrator()` retornam:
 [
     'success' => true|false,
     'data'    => [...],
+    'status'  => 200,                 // HTTP do orchestrator (201 nas criações)
+    'message' => 'Operation completed successfully.',  // mensagem do orchestrator, quando houver
 ]
 ```
+
+A `message` do sucesso traz avisos que importam, como o do `setShippingWebhook()` (o `secret` só aparece uma vez). A etiqueta em PDF (`getShipmentLabel`/`getShipmentLabels`) volta com `data.content`, `data.content_type` e `data.filename`.
 
 `success => false` com `data => []` é o retorno de **qualquer falha** — os métodos **nunca lançam exceção** para não derrubar a request (degradação graciosa). A falha traz também o que o orchestrator respondeu, para mostrar ao usuário:
 
@@ -153,10 +157,15 @@ Todos os métodos do helper `orchestrator()` retornam:
     'status'  => 422,                 // HTTP do orchestrator; null sem resposta (conexão, token ausente)
     'message' => 'Dados inválidos.',  // mensagem do orchestrator, quando houver
     'errors'  => ['to.postal_code' => ['O CEP deve ter 8 dígitos.']],  // erros de validação
+    'retry_after' => null,            // no 429: segundos até poder tentar de novo
 ]
 ```
 
-Status comuns: 401 chave inválida, 402 serviço fora do plano, 403 plano inativo, 404 não encontrado, 409 conflito (ex.: etiqueta ainda não pronta), 410 fonte de dados fora do ar, 422 validação, 429 limite, 503 serviço não configurado no servidor.
+**Erros da conta.** 401 (chave inválida), 402 (serviço fora do plano), 403 (plano expirado, chave sem permissão, chave de teste fora do frete) e 429 (limite ou cota) dizem respeito à **sua** conta no orchestrator, não ao usuário final da app. Por isso não chegam a ele: o retorno vem com `status` 503 e `message` genérica em inglês (`Connection::UNAVAILABLE_MESSAGE`: *This service is temporarily unavailable. Please try again later.*), sem `errors`. O status, o `error_code` (identificador estável: `INVALID_API_KEY`, `FEATURE_NOT_IN_PLAN`, `PLAN_EXPIRED`, `RATE_LIMITED`, `REQUEST_LIMIT_REACHED`...) e o corpo originais vão para o log: `error` em 401/402/403 e na cota esgotada (`REQUEST_LIMIT_REACHED`), `warning` no limite por minuto (`RATE_LIMITED`). A mesma mensagem genérica vem quando o orchestrator não responde (`status` null).
+
+Erros da consulta (404 não encontrado, 409, 422, 503 da fonte...) chegam como o orchestrator mandou, com a mensagem dele.
+
+Status comuns: 404 não encontrado, 409 conflito (ex.: etiqueta ainda não pronta), 422 validação, 503 fonte de dados fora do ar, serviço não configurado no servidor ou erro da conta (acima).
 
 Cai nesse retorno quando:
 
@@ -164,7 +173,8 @@ Cai nesse retorno quando:
 |---|---|---|
 | Timeout / DNS / conexão recusada | `errorResponse` (não vira HTTP 500) | `warning` |
 | HTTP 5xx (orchestrator quebrado) | `errorResponse` | `error` |
-| HTTP 4xx (401/404/429...) | `errorResponse` | `warning` (com status + corpo) |
+| HTTP 401/402/403 (chave/plano) e 429 de cota esgotada | `errorResponse` (503 genérico) | `error` (com status, `error_code` + corpo) |
+| HTTP 4xx (404/422, 429 por minuto...) | `errorResponse` (429 vira 503 genérico) | `warning` (com status + corpo) |
 | `ORCHESTRATOR_TOKEN` não configurado | `errorResponse` **sem** sair pra rede | `error` |
 | Corpo não-JSON / shape inesperado | `success:false`, `data:[]` (não quebra) | — |
 
@@ -307,18 +317,18 @@ foreach ($result['data'] as $holiday) {
 ## Clima
 
 ```php
-// Por cidade e país
+// Por cidade e país (ISO 3166-1 alpha-2: BR, GB, US...)
 $result = orchestrator()->getWeather('London', 'GB');
 
 // Por cidade, país e estado (recomendado para cidades brasileiras)
 $result = orchestrator()->getWeather('São Paulo', 'BR', 'SP');
 
 foreach ($result['data'] as $forecast) {
-    $forecast['date'];              // 2026-05-31
-    $forecast['max'];               // Temperatura máxima
-    $forecast['min'];               // Temperatura mínima
-    $forecast['condition'];         // Descrição (ex: Parcialmente nublado)
-    $forecast['rain_probability'];  // % de chuva
+    $forecast['date'];                    // 2026-05-31
+    $forecast['temperature']['max'];      // Temperatura máxima
+    $forecast['temperature']['min'];      // Temperatura mínima
+    $forecast['condition']['description']; // Descrição (ex: Parcialmente nublado)
+    $forecast['rain']['probability'];     // % de chuva
 }
 ```
 
@@ -331,11 +341,11 @@ foreach ($result['data'] as $forecast) {
 $result = orchestrator()->getDomain('risetech.com.br');
 $result = orchestrator()->getDomain('https://risetech.com.br');
 
-$result['data']['registered'];    // true/false
-$result['data']['created_at'];    // Data de criação
-$result['data']['expires_at'];    // Data de expiração
-$result['data']['nameservers'];   // Nameservers
-$result['data']['owner'];         // Proprietário
+// Domínio não registrado volta como falha com status 404
+$result['data']['created'];       // Data de criação
+$result['data']['expiration'];    // Data de expiração
+$result['data']['name_servers'];  // Nameservers
+$result['data']['holder'];        // Titular
 ```
 
 ---
@@ -345,8 +355,9 @@ $result['data']['owner'];         // Proprietário
 Combina feriados + previsão do tempo por período.
 
 ```php
+// Aqui o país vai em ISO 3166-1 alpha-3 (BRA), diferente do clima
 $result = orchestrator()->getCalendar(
-    country: 'BR',
+    country: 'BRA',
     state:   'SP',
     city:    'São Paulo',
     start:   '2026-06-01',
@@ -563,7 +574,8 @@ $r['data']['disposable'];    // e-mail descartável
 $r['data']['role_account'];  // contato@, vendas@...
 $r['data']['suggestion'];    // contato@gmail.com
 
-$r = orchestrator()->validatePhone('(21) 98765-4321');  // sem DDI, lido como brasileiro
+$r = orchestrator()->validatePhone('(21) 98765-4321');  // com DDD; sem DDI, lido como brasileiro
+$r = orchestrator()->validatePhone('+1 202 555-0100');  // de outro país: informe o +DDI
 $r['data']['valid'];     // true
 $r['data']['type'];      // mobile | fixed_line ...
 $r['data']['e164'];      // +5521987654321

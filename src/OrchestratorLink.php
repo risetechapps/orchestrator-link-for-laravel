@@ -65,6 +65,8 @@ class OrchestratorLink
         Route::post('/services/pix/decode', [OrchestratorLinkController::class, 'pixDecode']);
 
         // ─── NCM ─────────────────────────────────────────────────────────────
+        Route::get('/services/ncm', [OrchestratorLinkController::class, 'ncmSearch']);
+        // Caminho antigo da busca, mantido por compatibilidade.
         Route::get('/services/ncm/search', [OrchestratorLinkController::class, 'ncmSearch']);
         Route::get('/services/ncm/{code}/taxes', [OrchestratorLinkController::class, 'ncmTaxes']);
         Route::get('/services/ncm/{code}', [OrchestratorLinkController::class, 'ncm']);

@@ -69,22 +69,22 @@ class Service extends Connection
 
     public function getCountryInfo(string $country): array
     {
-        return static::request('/country/' . $country, cacheTtl: self::TTL_STATIC);
+        return static::request('/country/' . static::segment($country), cacheTtl: self::TTL_STATIC);
     }
 
     public function getStates(string $country): array
     {
-        return static::request('/states/' . $country, cacheTtl: self::TTL_STATIC);
+        return static::request('/states/' . static::segment($country), cacheTtl: self::TTL_STATIC);
     }
 
     public function getStateInfo(string $country, string $state): array
     {
-        return static::request('/states/' . $country . '/' . $state, cacheTtl: self::TTL_STATIC);
+        return static::request('/states/' . static::segment($country) . '/' . static::segment($state), cacheTtl: self::TTL_STATIC);
     }
 
     public function getCities(string $country, string $state): array
     {
-        return static::request('/cities/' . $country . '/' . $state, cacheTtl: self::TTL_STATIC);
+        return static::request('/cities/' . static::segment($country) . '/' . static::segment($state), cacheTtl: self::TTL_STATIC);
     }
 
     // ─── Localização: código IBGE e geolocalização ───────────────────────────
@@ -93,7 +93,7 @@ class Service extends Connection
     public function getIbgeCities(string $uf, ?string $name = null): array
     {
         $query = $name ? '?' . http_build_query(['name' => $name]) : '';
-        return static::request('/ibge/cities/' . strtoupper($uf) . $query, cacheTtl: self::TTL_STATIC);
+        return static::request('/ibge/cities/' . static::segment(strtoupper($uf)) . $query, cacheTtl: self::TTL_STATIC);
     }
 
     /** Município pelo código IBGE (7 dígitos). */
@@ -129,19 +129,19 @@ class Service extends Connection
 
     public function getHolidays(string $state, string $year): array
     {
-        return static::request('/holidays/' . $year . '/' . $state, cacheTtl: self::TTL_STATIC);
+        return static::request('/holidays/' . static::segment($year) . '/' . static::segment($state), cacheTtl: self::TTL_STATIC);
     }
 
     public function getWeather(string $city, string $country, string $state = ''): array
     {
-        $path = '/weather/' . $city . '/' . $country . ($state ? '/' . $state : '');
+        $path = '/weather/' . static::segment($city) . '/' . static::segment($country) . ($state ? '/' . static::segment($state) : '');
         return static::request($path);
     }
 
     public function getDomain(string $domain): array
     {
         $domain = Str::replace(['https://', 'http://'], '', $domain);
-        return static::request('/domain/' . $domain, cacheTtl: self::TTL_HOUR);
+        return static::request('/domain/' . static::segment($domain), cacheTtl: self::TTL_HOUR);
     }
 
     public function getCalendar(string $country, string $state, string $city, string $start, string $end): array
@@ -159,36 +159,36 @@ class Service extends Connection
 
     public function getFipeBrands(string $type): array
     {
-        return static::request('/fipe/' . $type . '/brands', cacheTtl: self::TTL_STATIC);
+        return static::request('/fipe/' . static::segment($type) . '/brands', cacheTtl: self::TTL_STATIC);
     }
 
     public function getFipeModels(string $type, string $brand): array
     {
-        return static::request('/fipe/' . $type . '/' . $brand . '/models', cacheTtl: self::TTL_STATIC);
+        return static::request('/fipe/' . static::segment($type) . '/' . static::segment($brand) . '/models', cacheTtl: self::TTL_STATIC);
     }
 
     public function getFipeYears(string $type, string $brand, string $model): array
     {
-        return static::request('/fipe/' . $type . '/' . $brand . '/' . $model . '/years', cacheTtl: self::TTL_STATIC);
+        return static::request('/fipe/' . static::segment($type) . '/' . static::segment($brand) . '/' . static::segment($model) . '/years', cacheTtl: self::TTL_STATIC);
     }
 
     public function getFipePrice(string $type, string $brand, string $model, string $year): array
     {
-        return static::request('/fipe/' . $type . '/' . $brand . '/' . $model . '/' . $year, cacheTtl: self::TTL_STATIC);
+        return static::request('/fipe/' . static::segment($type) . '/' . static::segment($brand) . '/' . static::segment($model) . '/' . static::segment($year), cacheTtl: self::TTL_STATIC);
     }
 
     // ─── Câmbio ──────────────────────────────────────────────────────────────
 
     public function getExchange(string $from, string $to): array
     {
-        return static::request('/exchange/' . strtoupper($from) . '/' . strtoupper($to));
+        return static::request('/exchange/' . static::segment(strtoupper($from)) . '/' . static::segment(strtoupper($to)));
     }
 
     // ─── Ações B3 ────────────────────────────────────────────────────────────
 
     public function getStock(string $symbol): array
     {
-        return static::request('/stocks/' . strtoupper($symbol));
+        return static::request('/stocks/' . static::segment(strtoupper($symbol)));
     }
 
     /**
@@ -216,7 +216,7 @@ class Service extends Connection
     public function getIndicator(string $indicator, ?string $from = null, ?string $to = null): array
     {
         $query = http_build_query(array_filter(['from' => $from, 'to' => $to]));
-        return static::request('/indicators/' . strtolower($indicator) . ($query ? '?' . $query : ''), cacheTtl: self::TTL_HOUR);
+        return static::request('/indicators/' . static::segment(strtolower($indicator)) . ($query ? '?' . $query : ''), cacheTtl: self::TTL_HOUR);
     }
 
     /** Lê um PIX copia e cola: confere o CRC e devolve chave, recebedor, valor, txid etc. */
@@ -253,7 +253,7 @@ class Service extends Connection
         return static::request('/email/' . rawurlencode(trim($email)), cacheTtl: self::TTL_HOUR);
     }
 
-    /** Valida o telefone (sem DDI, lido como brasileiro): tipo, formatos, UF e cidades do DDD. */
+    /** Valida o telefone com DDD; sem DDI é lido como brasileiro, com `+DDI` vale de outros países. */
     public function validatePhone(string $phone): array
     {
         $phone = preg_replace('/[^0-9+]/', '', $phone);
@@ -336,19 +336,19 @@ class Service extends Connection
     /** Envio com o histórico de eventos. */
     public function getShipment(string $id): array
     {
-        return static::request('/shipping/shipments/' . $id);
+        return static::request('/shipping/shipments/' . static::segment($id));
     }
 
     /** Gera (ou devolve, se ainda válido) o PIX do envio. A etiqueta é comprada quando o PIX for pago. */
     public function purchaseShipment(string $id, ?string $idempotencyKey = null): array
     {
-        return static::request('/shipping/shipments/' . $id . '/purchase', 'POST', headers: ['Idempotency-Key' => $idempotencyKey]);
+        return static::request('/shipping/shipments/' . static::segment($id) . '/purchase', 'POST', headers: ['Idempotency-Key' => $idempotencyKey]);
     }
 
     /** Último pagamento do envio, conferido no gateway. */
     public function getShipmentPayment(string $id): array
     {
-        return static::request('/shipping/shipments/' . $id . '/payment');
+        return static::request('/shipping/shipments/' . static::segment($id) . '/payment');
     }
 
     /** Um PIX para vários envios (até 50). */
@@ -362,13 +362,13 @@ class Service extends Connection
     /** Situação do PIX de vários envios (o `id` devolvido por payShipments). */
     public function getShipmentPaymentGroup(string $groupId): array
     {
-        return static::request('/shipping/shipments/payments/' . $groupId);
+        return static::request('/shipping/shipments/payments/' . static::segment($groupId));
     }
 
     /** Só com a chave de teste: aprova o PIX simulado e segue o fluxo (etiqueta no sandbox). */
     public function simulateShipmentPayment(string $id): array
     {
-        return static::request('/shipping/shipments/' . $id . '/payment/simulate', 'POST');
+        return static::request('/shipping/shipments/' . static::segment($id) . '/payment/simulate', 'POST');
     }
 
     /**
@@ -377,25 +377,25 @@ class Service extends Connection
      */
     public function reverseShipment(string $id, array $data, ?string $idempotencyKey = null): array
     {
-        return static::request('/shipping/shipments/' . $id . '/reverse', 'POST', $data, headers: ['Idempotency-Key' => $idempotencyKey]);
+        return static::request('/shipping/shipments/' . static::segment($id) . '/reverse', 'POST', $data, headers: ['Idempotency-Key' => $idempotencyKey]);
     }
 
     /** Cancela o envio; se já pago, o PIX é estornado. */
     public function cancelShipment(string $id, ?string $reason = null): array
     {
-        return static::request('/shipping/shipments/' . $id . '/cancel', 'POST', array_filter(['reason' => $reason]));
+        return static::request('/shipping/shipments/' . static::segment($id) . '/cancel', 'POST', array_filter(['reason' => $reason]));
     }
 
     /** Sincroniza status e rastreio com a transportadora e devolve o envio atualizado. */
     public function trackShipment(string $id): array
     {
-        return static::request('/shipping/shipments/' . $id . '/tracking');
+        return static::request('/shipping/shipments/' . static::segment($id) . '/tracking');
     }
 
     /** PDF da etiqueta: `data.content` (bytes), `data.content_type` e `data.filename`. */
     public function getShipmentLabel(string $id): array
     {
-        return static::download('/shipping/shipments/' . $id . '/label');
+        return static::download('/shipping/shipments/' . static::segment($id) . '/label');
     }
 
     /** Um PDF com as etiquetas de vários envios (até 50). */
@@ -435,6 +435,15 @@ class Service extends Connection
     protected static function cnpj(string $cnpj): string
     {
         return preg_replace('/[^0-9A-Z]/', '', strtoupper($cnpj));
+    }
+
+    /**
+     * Valor que vai num segmento do caminho. Sem codificar, uma `/`, `?` ou `#`
+     * no valor (cidade, marca, domínio...) mudaria a rota chamada.
+     */
+    protected static function segment(string $value): string
+    {
+        return rawurlencode($value);
     }
 
     /** Remetente com o endereço em `from`; o que já vem assim passa como está. */
