@@ -69,7 +69,7 @@ Para expor os endpoints como proxy na sua aplicação:
 
 > As rotas usam a chave da **sua** conta no orchestrator. Coloque-as atrás da autenticação da sua app (`Route::middleware('auth')->group(...)`): sem isso, qualquer visitante consulta com a sua cota e, no frete, vê e cria envios da conta.
 
-As rotas respondem com o status HTTP do orchestrator: 201 nas criações (envio, remetente, PIX, devolução), o corpo de erro (`success: false`, `status`, `message`, `errors`) com 422, 409 etc., e **502** quando o orchestrator não respondeu (fora do ar ou `ORCHESTRATOR_TOKEN` ausente). Erros da sua conta no orchestrator (401, 402, 403, 429) respondem **503** com a mensagem genérica (veja abaixo); no 429, o header `Retry-After` é repassado. O 404 do orchestrator (dado não encontrado: CPF, CEP, domínio, envio...) responde **410** com a mesma mensagem, para o front não confundir com rota inexistente, que continua 404.
+As rotas respondem 200 no sucesso e 201 nas criações (envio, remetente, PIX, devolução). A validação responde **422**, com o corpo de erro (`success: false`, `status`, `message`, `errors`). Todas as outras falhas respondem **410** com a mensagem: dado não encontrado (404), conflito (409), fonte de dados fora do ar (503), erro interno do frete (500), orchestrator sem resposta (fora do ar ou `ORCHESTRATOR_TOKEN` ausente) e erros da sua conta (401, 402, 403, 429), que trazem a mensagem genérica (veja abaixo). No 429, o header `Retry-After` é repassado. Rota inexistente continua 404.
 
 Isso registra as rotas abaixo no seu app:
 

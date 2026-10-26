@@ -5,6 +5,10 @@ O formato é baseado em [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Não lançado]
 
+### Corrigido
+
+- Rotas proxy: toda falha, menos a validação (422), responde 410 com a mensagem, como já fazia o 404. Vale para 409, 429, 500, 503 da fonte (ex.: `CPF lookup is temporarily unavailable.`), erros da conta (antes 503 genérico) e orchestrator sem resposta (antes 502). O 429 continua repassando o `Retry-After`. O retorno de `orchestrator()->...` mantém o `status` original.
+
 ## [1.0.3] - 2026-10-26
 
 ### Corrigido

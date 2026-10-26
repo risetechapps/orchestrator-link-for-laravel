@@ -53,35 +53,35 @@ it('etiqueta indisponível volta como o JSON de erro', function () {
     $this->get('/services/shipping/shipments/x/label')->assertStatus(410)->assertJson(['success' => false, 'status' => 410, 'message' => 'Envio não encontrado.']);
 });
 
-it('repassa o status HTTP do erro do orchestrator', function () {
+it('validação continua 422 com a mensagem e os errors', function () {
     Http::fake(['*' => Http::response(['success' => false, 'message' => 'Dados inválidos.', 'errors' => ['from' => ['O campo from é obrigatório.']]], 422)]);
 
     $this->postJson('/services/shipping/senders', ['label' => 'Loja'])
         ->assertStatus(422)
-        ->assertJson(['success' => false, 'status' => 422, 'errors' => ['from' => ['O campo from é obrigatório.']]]);
+        ->assertJson(['success' => false, 'status' => 422, 'message' => 'Dados inválidos.', 'errors' => ['from' => ['O campo from é obrigatório.']]]);
 });
 
-it('responde 502 quando o orchestrator não responde', function () {
+it('responde 410 quando o orchestrator não responde', function () {
     Http::fake(['*' => fn () => throw new \Illuminate\Http\Client\ConnectionException('timeout')]);
 
-    $this->getJson('/services/banks')->assertStatus(502)->assertJson(['success' => false, 'status' => null]);
+    $this->getJson('/services/banks')->assertStatus(410)->assertJson(['success' => false, 'status' => 410, 'message' => Connection::UNAVAILABLE_MESSAGE]);
 });
 
-it('erro da conta responde 503 genérico, sem a mensagem do orchestrator', function () {
+it('erro da conta responde 410 genérico, sem a mensagem do orchestrator', function () {
     Http::fake(['*' => Http::response(['success' => false, 'message' => 'Your plan has expired or is not active.', 'error_code' => 'PLAN_EXPIRED'], 403)]);
 
     $this->getJson('/services/banks')
-        ->assertStatus(503)
-        ->assertJson(['success' => false, 'status' => 503, 'message' => Connection::UNAVAILABLE_MESSAGE])
+        ->assertStatus(410)
+        ->assertJson(['success' => false, 'status' => 410, 'message' => Connection::UNAVAILABLE_MESSAGE])
         ->assertDontSee('plan')
         ->assertDontSee('PLAN_EXPIRED');
 });
 
-it('no 429 responde 503 genérico e repassa o Retry-After', function () {
+it('no 429 responde 410 genérico e repassa o Retry-After', function () {
     Http::fake(['*' => Http::response(['success' => false, 'message' => 'Too many requests per minute. Please wait and try again.', 'error_code' => 'RATE_LIMITED', 'retry_after' => 30], 429, ['Retry-After' => '30'])]);
 
     $this->getJson('/services/banks')
-        ->assertStatus(503)
+        ->assertStatus(410)
         ->assertHeader('Retry-After', '30')
         ->assertJson(['success' => false, 'message' => Connection::UNAVAILABLE_MESSAGE, 'retry_after' => 30]);
 });
@@ -102,6 +102,19 @@ it('404 do orchestrator volta 410 com a mesma mensagem', function (string $metho
     'NCM'          => ['GET', '/services/ncm/85171300/taxes', 'NCM not found in the IBPT table.'],
     'envio'        => ['POST', '/services/shipping/shipments/' . SHIPMENT_ID_PROXY . '/cancel', 'Envio não encontrado.'],
     'remetente'    => ['DELETE', '/services/shipping/senders/1', 'Remetente não encontrado.'],
+]);
+
+it('demais erros do orchestrator voltam 410 com a mesma mensagem', function (string $method, string $uri, int $status, string $message) {
+    Http::fake(['*' => Http::response(['success' => false, 'message' => $message], $status)]);
+
+    $this->json($method, $uri)
+        ->assertStatus(410)
+        ->assertJson(['success' => false, 'status' => 410, 'message' => $message]);
+})->with([
+    '503 CPF'        => ['GET', '/services/cpf/12345678909', 503, 'CPF lookup is temporarily unavailable.'],
+    '503 frete'      => ['POST', '/services/shipping/quotes', 503, 'Serviço de frete temporariamente indisponível. Tente novamente em instantes.'],
+    '409 etiqueta'   => ['POST', '/services/shipping/shipments/' . SHIPMENT_ID_PROXY . '/cancel', 409, 'Este envio não pode mais ser cancelado.'],
+    '500 frete'      => ['POST', '/services/shipping/shipments', 500, 'Não foi possível processar a solicitação de frete.'],
 ]);
 
 it('rota inexistente continua 404', function () {
