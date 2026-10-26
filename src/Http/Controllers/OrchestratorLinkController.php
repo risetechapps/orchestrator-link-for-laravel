@@ -380,12 +380,17 @@ class OrchestratorLinkController extends Controller
 
     /**
      * Resposta do orchestrator com o status HTTP dele: 201 das criações, 422
-     * de validação, 404, 409... chegam ao front como vieram. Sem resposta
-     * (orchestrator fora do ar ou chave não configurada), 502. No 429, o
-     * Retry-After é repassado.
+     * de validação, 409... chegam ao front como vieram. O 404 (dado não
+     * encontrado) vira 410 com a mesma mensagem, para o front não confundir
+     * com rota inexistente. Sem resposta (orchestrator fora do ar ou chave
+     * não configurada), 502. No 429, o Retry-After é repassado.
      */
     private function respond(array $result): JsonResponse
     {
+        if (($result['status'] ?? null) === Response::HTTP_NOT_FOUND) {
+            $result['status'] = Response::HTTP_GONE;
+        }
+
         $status = $result['status'] ?? ($result['success'] ? 200 : 502);
 
         $headers = isset($result['retry_after']) ? ['Retry-After' => (string) $result['retry_after']] : [];

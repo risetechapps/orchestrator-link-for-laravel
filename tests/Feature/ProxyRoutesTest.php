@@ -50,7 +50,7 @@ it('a etiqueta volta como PDF', function () {
 it('etiqueta indisponível volta como o JSON de erro', function () {
     Http::fake(['*' => Http::response(['success' => false, 'message' => 'Envio não encontrado.'], 404)]);
 
-    $this->get('/services/shipping/shipments/x/label')->assertNotFound()->assertJson(['success' => false, 'status' => 404, 'message' => 'Envio não encontrado.']);
+    $this->get('/services/shipping/shipments/x/label')->assertStatus(410)->assertJson(['success' => false, 'status' => 410, 'message' => 'Envio não encontrado.']);
 });
 
 it('repassa o status HTTP do erro do orchestrator', function () {
@@ -87,3 +87,23 @@ it('no 429 responde 503 genérico e repassa o Retry-After', function () {
 });
 
 const SHIPMENT_ID_PROXY = '0c3f8a1e-2b4d-4c6e-8f0a-1b2c3d4e5f60';
+
+it('404 do orchestrator volta 410 com a mesma mensagem', function (string $method, string $uri, string $message) {
+    Http::fake(['*' => Http::response(['success' => false, 'code' => 404, 'message' => $message], 404)]);
+
+    $this->json($method, $uri)
+        ->assertStatus(410)
+        ->assertJson(['success' => false, 'status' => 410, 'message' => $message]);
+})->with([
+    'domínio'      => ['GET', '/services/domain/naoexiste.com.br', 'Domain not found.'],
+    'CPF'          => ['GET', '/services/cpf/12345678909', 'CPF not found.'],
+    'CEP'          => ['GET', '/services/zip_code/01001000', 'ZIP code not found.'],
+    'FIPE'         => ['GET', '/services/fipe/cars/1/2/years', 'Model not found.'],
+    'NCM'          => ['GET', '/services/ncm/85171300/taxes', 'NCM not found in the IBPT table.'],
+    'envio'        => ['POST', '/services/shipping/shipments/' . SHIPMENT_ID_PROXY . '/cancel', 'Envio não encontrado.'],
+    'remetente'    => ['DELETE', '/services/shipping/senders/1', 'Remetente não encontrado.'],
+]);
+
+it('rota inexistente continua 404', function () {
+    $this->getJson('/services/rota-que-nao-existe/x/y/z/w')->assertNotFound();
+});

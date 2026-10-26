@@ -14,6 +14,7 @@ O formato é baseado em [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Corrigido
 
+- Rotas proxy: o 404 do orchestrator (dado não encontrado) responde 410 (Gone) com a mesma mensagem (ex.: `Domain not found.`, `Envio não encontrado.`). O 404 ficava igual ao de rota inexistente no front. O retorno de `orchestrator()->...` continua com `status` 404.
 - As rotas proxy respondem 201 nas criações (envio, remetente, PIX, devolução), como o orchestrator, em vez de 200, e repassam o header `Retry-After` no 429.
 - Valores de texto que vão no caminho (cidade, estado, país, domínio, marca/modelo/ano FIPE, símbolo, indicador, id do envio) são codificados com `rawurlencode`. Uma `/`, `?` ou `#` no valor mudava a rota chamada.
 - README: país do calendário em ISO3 (`BRA`), campos do clima e do WHOIS conforme a API, e telefone de outros países com `+DDI`.

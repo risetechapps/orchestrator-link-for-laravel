@@ -69,7 +69,7 @@ Para expor os endpoints como proxy na sua aplicação:
 
 > As rotas usam a chave da **sua** conta no orchestrator. Coloque-as atrás da autenticação da sua app (`Route::middleware('auth')->group(...)`): sem isso, qualquer visitante consulta com a sua cota e, no frete, vê e cria envios da conta.
 
-As rotas respondem com o status HTTP do orchestrator: 201 nas criações (envio, remetente, PIX, devolução), o corpo de erro (`success: false`, `status`, `message`, `errors`) com 422, 404, 409 etc., e **502** quando o orchestrator não respondeu (fora do ar ou `ORCHESTRATOR_TOKEN` ausente). Erros da sua conta no orchestrator (401, 402, 403, 429) respondem **503** com a mensagem genérica (veja abaixo); no 429, o header `Retry-After` é repassado.
+As rotas respondem com o status HTTP do orchestrator: 201 nas criações (envio, remetente, PIX, devolução), o corpo de erro (`success: false`, `status`, `message`, `errors`) com 422, 409 etc., e **502** quando o orchestrator não respondeu (fora do ar ou `ORCHESTRATOR_TOKEN` ausente). Erros da sua conta no orchestrator (401, 402, 403, 429) respondem **503** com a mensagem genérica (veja abaixo); no 429, o header `Retry-After` é repassado. O 404 do orchestrator (dado não encontrado: CPF, CEP, domínio, envio...) responde **410** com a mesma mensagem, para o front não confundir com rota inexistente, que continua 404.
 
 Isso registra as rotas abaixo no seu app:
 
@@ -341,7 +341,7 @@ foreach ($result['data'] as $forecast) {
 $result = orchestrator()->getDomain('risetech.com.br');
 $result = orchestrator()->getDomain('https://risetech.com.br');
 
-// Domínio não registrado volta como falha com status 404
+// Domínio não registrado volta como falha com status 404 (410 na rota proxy)
 $result['data']['created'];       // Data de criação
 $result['data']['expiration'];    // Data de expiração
 $result['data']['name_servers'];  // Nameservers
