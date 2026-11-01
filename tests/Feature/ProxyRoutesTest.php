@@ -28,7 +28,18 @@ it('repassa as consultas novas', function (string $uri, string $path) {
     'série'            => ['/services/indicators/selic?from=2025-01-01', '/indicators/selic?from=2025-01-01'],
     'sócios'           => ['/services/cnpj/33000167000101/partners', '/cnpj/33000167000101/partners'],
     'envios'           => ['/services/shipping/shipments?status=posted&ignored=1', '/shipping/shipments?status=posted'],
+    'banco'            => ['/services/banks/001', '/banks/001'],
+    'cidades'          => ['/services/cities/BRA/SP?name=sao%20pau', '/cities/BRA/SP?name=sao+pau'],
+    'busca de NCM paginada' => ['/services/ncm?search=celular&page=2&per_page=50', '/ncm?search=celular&page=2&per_page=50'],
+    'tabela NCM'       => ['/services/ncm?page=2', '/ncm?page=2'],
+    'tributos com EX'  => ['/services/ncm/85171300/taxes?uf=SP&ex=1', '/ncm/85171300/taxes?uf=SP&ex=1'],
 ]);
+
+it('a rota proxy devolve a paginação junto', function () {
+    Http::fake(['*' => Http::response(['success' => true, 'code' => 200, 'data' => [], 'pagination' => ['total' => 0]])]);
+
+    $this->getJson('/services/ncm?search=x')->assertOk()->assertJsonPath('pagination.total', 0);
+});
 
 it('repassa a chave de idempotência na criação do envio', function () {
     Http::fake(['*' => ok(['id' => SHIPMENT_ID_PROXY], 201)]);

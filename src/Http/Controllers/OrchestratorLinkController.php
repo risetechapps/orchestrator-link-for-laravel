@@ -63,6 +63,11 @@ class OrchestratorLinkController extends Controller
         return $this->respond($this->service->getBanks());
     }
 
+    public function bank(Request $request, string $code): JsonResponse
+    {
+        return $this->respond($this->service->getBank($code));
+    }
+
     public function countries(): JsonResponse
     {
         return $this->respond($this->service->getCountries());
@@ -85,7 +90,7 @@ class OrchestratorLinkController extends Controller
 
     public function cities(Request $request, string $country, string $state): JsonResponse
     {
-        return $this->respond($this->service->getCities($country, $state));
+        return $this->respond($this->service->getCities($country, $state, $request->query('name')));
     }
 
     // ─── Código IBGE / Geolocalização ────────────────────────────────────────
@@ -212,12 +217,20 @@ class OrchestratorLinkController extends Controller
 
     public function ncmSearch(Request $request): JsonResponse
     {
-        return $this->respond($this->service->searchNcm($request->query('search', '')));
+        return $this->respond($this->service->searchNcm(
+            $request->query('search'),
+            $request->filled('page') ? (int) $request->query('page') : null,
+            $request->filled('per_page') ? (int) $request->query('per_page') : null,
+        ));
     }
 
     public function ncmTaxes(Request $request, string $code): JsonResponse
     {
-        return $this->respond($this->service->getNcmTaxes($code, (string) $request->query('uf', '')));
+        return $this->respond($this->service->getNcmTaxes(
+            $code,
+            (string) $request->query('uf', ''),
+            $request->filled('ex') ? (int) $request->query('ex') : null,
+        ));
     }
 
     // ─── Validação: e-mail e telefone ────────────────────────────────────────

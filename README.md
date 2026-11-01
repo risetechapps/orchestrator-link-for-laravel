@@ -88,11 +88,12 @@ Isso registra as rotas abaixo no seu app:
 | GET | `/services/geo/zip_code/{zip_code}` | Coordenadas do CEP |
 | GET | `/services/geo/distance/{from}/{to}` | Distância entre CEPs |
 | GET | `/services/banks` | Bancos |
+| GET | `/services/banks/{code}` | Um banco (código de compensação ou ISPB) |
 | GET | `/services/countries` | Países |
 | GET | `/services/country/{country}` | Info de país |
 | GET | `/services/states/{country}` | Estados |
 | GET | `/services/states/{country}/{state}` | Info de estado |
-| GET | `/services/cities/{country}/{state}` | Cidades |
+| GET | `/services/cities/{country}/{state}?name=` | Cidades (`name` filtra pelo trecho do nome) |
 | GET | `/services/holidays/{year}/{state}` | Feriados |
 | GET | `/services/weather/{city}/{country}/{state?}` | Clima |
 | GET | `/services/domain/{domain}` | WHOIS |
@@ -107,9 +108,9 @@ Isso registra as rotas abaixo no seu app:
 | GET | `/services/indicators` | Indicadores econômicos |
 | GET | `/services/indicators/{indicator}?from=&to=` | Um indicador / série |
 | POST | `/services/pix/decode` | PIX copia e cola |
-| GET | `/services/ncm?search=` | NCM por descrição (`/services/ncm/search` também responde) |
+| GET | `/services/ncm?search=&page=&per_page=` | NCM por descrição, paginado (`/services/ncm/search` também responde) |
 | GET | `/services/ncm/{code}` | NCM por código |
-| GET | `/services/ncm/{code}/taxes?uf=` | Tributos do NCM (IBPT) |
+| GET | `/services/ncm/{code}/taxes?uf=&ex=` | Tributos do NCM (IBPT) |
 | GET | `/services/email/{email}` | Validação de e-mail |
 | GET | `/services/phone/{phone}` | Validação de telefone |
 | GET | `/services/shipping/services` | Serviços de entrega |
@@ -145,6 +146,8 @@ Todos os métodos do helper `orchestrator()` retornam:
     'message' => 'Operation completed successfully.',  // mensagem do orchestrator, quando houver
 ]
 ```
+
+O que o orchestrator manda ao lado de `data` também vem no retorno: `pagination` na busca de NCM e `unavailable` no calendário.
 
 A `message` do sucesso traz avisos que importam, como o do `setShippingWebhook()` (o `secret` só aparece uma vez). A etiqueta em PDF (`getShipmentLabel`/`getShipmentLabels`) volta com `data.content`, `data.content_type` e `data.filename`.
 
@@ -213,11 +216,15 @@ $result = orchestrator()->getCPF('98765432100');
 $result = orchestrator()->getCPF('987.654.321-00');
 
 // Resposta
-$result['data']['cpf'];         // CPF formatado
-$result['data']['name'];        // Nome
-$result['data']['status'];      // true = regular
-$result['data']['birth_date'];  // Data de nascimento (Y-m-d)
+$result['data']['cpf'];              // CPF formatado
+$result['data']['name'];             // Nome
+$result['data']['status'];           // true = regular
+$result['data']['situation'];        // Texto da Receita (REGULAR, SUSPENSA, TITULAR FALECIDO...)
+$result['data']['situation_as_of'];  // De quando é a situação (Y-m-d)
+$result['data']['birth_date'];       // Data de nascimento (Y-m-d)
 ```
+
+A data vai em `Y-m-d`. Se ela não bate com o nascimento já conhecido do CPF, a consulta volta 404. CPF que a fonte só consulta com a data volta 404 com `Birth date is required to look up this CPF.` quando ela não é enviada.
 
 ---
 
@@ -253,12 +260,15 @@ $result = orchestrator()->getZipCode('01310100');
 $result = orchestrator()->getZipCode('01310-100');
 
 // Resposta
-$result['data']['zip_code'];  // CEP formatado
-$result['data']['address'];   // Logradouro
-$result['data']['district'];  // Bairro
-$result['data']['city'];      // Cidade
-$result['data']['state'];     // Estado (sigla)
-$result['data']['country'];   // País
+$result['data']['zip_code'];    // 01.310-100
+$result['data']['address'];     // Logradouro
+$result['data']['number'];      // Quase sempre null: o CEP é da rua, não do imóvel
+$result['data']['complement'];  // Complemento, ou null
+$result['data']['district'];    // Bairro
+$result['data']['city'];        // Cidade
+$result['data']['state'];       // Estado (sigla)
+$result['data']['country'];     // País
+$result['data']['ibge'];        // Código IBGE do município (3550308)
 ```
 
 ---
@@ -269,9 +279,16 @@ $result['data']['country'];   // País
 $result = orchestrator()->getBanks();
 
 foreach ($result['data'] as $bank) {
-    $bank['code']; // Código (ex: 001)
-    $bank['name']; // Nome (ex: Banco do Brasil S.A.)
+    $bank['code'];        // Código de compensação com 3 dígitos (001); null no Banco Central e nas câmaras da B3
+    $bank['ispb'];        // ISPB, o que o PIX usa (00000000)
+    $bank['name'];        // Banco do Brasil S.A.
+    $bank['short_name'];  // BCO DO BRASIL S.A. (o do extrato)
+    $bank['logo_url'];    // ou null
 }
+
+// Um banco: pelo código (1 ou 001) ou pelo ISPB (8 dígitos)
+$result = orchestrator()->getBank('001');
+$result = orchestrator()->getBank('00038166');  // Banco Central: só tem ISPB
 ```
 
 ---
@@ -293,8 +310,11 @@ $result = orchestrator()->getStates('BR');
 // Info de um estado específico
 $result = orchestrator()->getStateInfo('BR', 'SP');
 
-// Cidades de um estado
+// Cidades de um estado (com latitude e longitude)
 $result = orchestrator()->getCities('BR', 'SP');
+
+// Só as que contêm o trecho do nome, sem acento
+$result = orchestrator()->getCities('BR', 'SP', 'sao pau');
 ```
 
 ---
@@ -306,9 +326,11 @@ $result = orchestrator()->getCities('BR', 'SP');
 $result = orchestrator()->getHolidays('SP', '2026');
 
 foreach ($result['data'] as $holiday) {
-    $holiday['date'];  // 2026-01-01
-    $holiday['name'];  // Confraternização Universal
-    $holiday['type'];  // national / state
+    $holiday['date'];   // 2026-01-01
+    $holiday['name'];   // Confraternização Universal
+    $holiday['type'];   // holiday (feriado) | optional (ponto facultativo)
+    $holiday['level'];  // national | state | city
+    $holiday['law'];    // lei que criou o feriado, ou null
 }
 ```
 
@@ -317,7 +339,7 @@ foreach ($result['data'] as $holiday) {
 ## Clima
 
 ```php
-// Por cidade e país (ISO 3166-1 alpha-2: BR, GB, US...)
+// Previsão de hoje a 4 dias. País em ISO 3166-1 alpha-2 (BR, GB, US...)
 $result = orchestrator()->getWeather('London', 'GB');
 
 // Por cidade, país e estado (recomendado para cidades brasileiras)
@@ -341,21 +363,25 @@ foreach ($result['data'] as $forecast) {
 $result = orchestrator()->getDomain('risetech.com.br');
 $result = orchestrator()->getDomain('https://risetech.com.br');
 
+// Subdomínio vira o domínio registrado (loja.risetech.com.br → risetech.com.br).
 // Domínio não registrado volta como falha com status 404 (410 na rota proxy)
+$result['data']['domain'];        // Domínio consultado
 $result['data']['created'];       // Data de criação
 $result['data']['expiration'];    // Data de expiração
 $result['data']['name_servers'];  // Nameservers
-$result['data']['holder'];        // Titular
+$result['data']['holder'];        // Titular (null quando oculto)
+$result['data']['status'];        // true = ativo (false em hold, pendingdelete, redemption...)
+$result['data']['states'];        // Estados do registro como vêm (clienttransferprohibited...)
 ```
 
 ---
 
 ## Calendário
 
-Combina feriados + previsão do tempo por período.
+Combina feriados + previsão do tempo por período (até 3 anos). Feriados só no Brasil; clima só de hoje a 4 dias.
 
 ```php
-// Aqui o país vai em ISO 3166-1 alpha-3 (BRA), diferente do clima
+// País em ISO2 (BR) ou ISO3 (BRA)
 $result = orchestrator()->getCalendar(
     country: 'BRA',
     state:   'SP',
@@ -366,9 +392,12 @@ $result = orchestrator()->getCalendar(
 
 foreach ($result['data'] as $day) {
     $day['date'];     // 2026-06-01
-    $day['weather'];  // Dados do clima
-    $day['holidays']; // Feriados do dia (ou null)
+    $day['weather'];  // Clima, no formato do getWeather() (ou null)
+    $day['holidays']; // Feriados do dia: [['name', 'type', 'level', 'law'], ...] (ou null)
 }
+
+// Fonte que falhou: sem isto, "não há feriado" e "a consulta caiu" seriam iguais
+$result['unavailable'];  // [] | ['holidays'] | ['weather']
 ```
 
 ---
@@ -380,32 +409,35 @@ Tipos disponíveis: `cars`, `motorcycles`, `trucks`
 ```php
 // 1. Listar marcas
 $brands = orchestrator()->getFipeBrands('cars');
-// [['code' => '059', 'name' => 'VOLKSWAGEN'], ...]
+// [['code' => '21', 'name' => 'Fiat'], ...]
 
 $brands = orchestrator()->getFipeBrands('motorcycles');
 $brands = orchestrator()->getFipeBrands('trucks');
 
 // 2. Listar modelos de uma marca
-$models = orchestrator()->getFipeModels('cars', '059');
-// [['code' => '5585', 'name' => 'AMAROK CD2.0...'], ...]
+$models = orchestrator()->getFipeModels('cars', '21');
+// [['code' => '5480', 'name' => 'UNO ATTRACTI. Celeb.1.4 EVO F.Flex 8V 2p'], ...]
 
 // 3. Anos disponíveis para um modelo (OBRIGATÓRIO antes do preço)
-$years = orchestrator()->getFipeYears('cars', '059', '5585');
-// [['code' => '2022-3', 'name' => '2022 Diesel'], ...]
+$years = orchestrator()->getFipeYears('cars', '21', '5480');
+// [['code' => '2012-5', 'name' => '2012 Flex'], ...]
 
 // 4. Preço FIPE (use o code retornado em getFipeYears)
-$price = orchestrator()->getFipePrice('cars', '059', '5585', '2022-3');
+$price = orchestrator()->getFipePrice('cars', '21', '5480', '2012-5');
 
-$price['data']['fipe_code'];        // Código FIPE
-$price['data']['brand'];            // Marca
+$price['data']['fipe_code'];        // 001348-0
+$price['data']['brand'];            // Fiat
 $price['data']['model'];            // Modelo
-$price['data']['year'];             // Ano
-$price['data']['fuel'];             // Combustível
-$price['data']['price'];            // Preço (ex: R$ 180.000,00)
-$price['data']['reference_month'];  // Mês de referência
+$price['data']['year'];             // 2012
+$price['data']['fuel'];             // Flex
+$price['data']['fuel_code'];        // F
+$price['data']['vehicle_type'];     // cars | motorcycles | trucks
+$price['data']['price'];            // R$ 29.539,00
+$price['data']['price_value'];      // 29539.0 (número, para calcular)
+$price['data']['reference_month'];  // novembro de 2026
 ```
 
-> **Sufixo do ano:** `-1` Gasolina · `-2` Álcool · `-3` Diesel
+> **Códigos:** marca, modelo e ano são os códigos da tabela FIPE (só dígitos; o ano é `ano-combustível`, ex.: `2012-5` = 2012 Flex, e `32000` é o zero-quilômetro). Outro formato volta 422 sem consultar a tabela.
 
 ---
 
@@ -427,6 +459,9 @@ $result['data']['low'];         // Mínima do dia
 $result['data']['variation'];   // Variação
 $result['data']['pct_change'];  // Variação em %
 $result['data']['updated_at'];  // Última atualização
+$result['data']['name'];        // Nome do par (moeda de origem/moeda de destino)
+$result['data']['source'];      // market (cotação de mercado) | ptax (Banco Central, só contra BRL)
+$result['data']['bulletin'];    // no PTAX: Abertura, Intermediário ou Fechamento; null no mercado
 ```
 
 ---
@@ -439,8 +474,8 @@ $result = orchestrator()->getStock('PETR4');
 $result = orchestrator()->getStock('VALE3');
 $result = orchestrator()->getStock('petr4'); // também funciona
 
-// Índices
-$result = orchestrator()->getStock('IBOV');
+// Índices, com ^ (Ibovespa)
+$result = orchestrator()->getStock('^BVSP');
 
 $result['data']['symbol'];      // PETR4
 $result['data']['name'];        // Petróleo Brasileiro S.A.
@@ -452,6 +487,8 @@ $result['data']['day_high'];    // Máxima do dia
 $result['data']['day_low'];     // Mínima do dia
 $result['data']['volume'];      // Volume negociado
 $result['data']['market_cap'];  // Capitalização de mercado
+// Também: previous_close, currency, exchange, updated_at, fifty_two_week_high,
+// fifty_two_week_low, price_earnings (P/L), earnings_per_share (LPA) e logo
 ```
 
 ---
@@ -459,21 +496,28 @@ $result['data']['market_cap'];  // Capitalização de mercado
 ## NCM (Nomenclatura Comum do Mercosul)
 
 ```php
-// Busca por código (8 dígitos — pontuação removida automaticamente)
+// Por código: de 2 a 8 dígitos (capítulo, posição, subposição ou item; pontuação removida)
 $result = orchestrator()->getNcm('84713019');
 $result = orchestrator()->getNcm('8471.30.19'); // também funciona
-
-// Busca por descrição (termo de texto livre)
-$result = orchestrator()->searchNcm('notebook');
-$result = orchestrator()->searchNcm('computador portátil');
+$result = orchestrator()->getNcm('8471');       // posição
 
 $result['data']['code'];         // 84713019
 $result['data']['description'];  // Descrição completa
+$result['data']['level'];        // chapter | heading | subheading | item | subitem
+$result['data']['hierarchy'];    // Capítulo, posição... acima do código
 $result['data']['start_date'];   // Vigência início
 $result['data']['end_date'];     // Vigência fim (null = vigente)
 $result['data']['act_type'];     // Tipo do ato
 $result['data']['act_number'];   // Número do ato
 $result['data']['act_year'];     // Ano do ato
+
+// Busca por descrição, paginada (padrão 100 por página, até 500)
+$result = orchestrator()->searchNcm('notebook');
+$result = orchestrator()->searchNcm('computador portátil', page: 2, perPage: 50);
+$result = orchestrator()->searchNcm(page: 1, perPage: 500);  // sem termo: a tabela inteira
+
+$result['data'];        // lista de NCMs, como acima
+$result['pagination'];  // ['current_page' => 2, 'per_page' => 50, 'total' => 120, 'total_pages' => 3]
 ```
 
 ---
@@ -535,12 +579,16 @@ $r = orchestrator()->getDistance('13010-001', '01001-000');
 ## Indicadores econômicos e PIX
 
 ```php
-// Último valor de Selic, CDI, IPCA, IPCA 12m, IGP-M, INPC e TR (Banco Central)
+// Último valor de cada indicador do Banco Central
 $r = orchestrator()->getIndicators();
-$r['data'][0];  // ['indicator' => 'selic', 'name' => ..., 'unit' => '% a.a.', 'date' => ..., 'value' => 13.75]
+$r['data'][0];  // ['indicator' => 'selic', 'name' => ..., 'unit' => '% a.a.', 'periodicity' => 'copom', 'sgs_code' => 432, 'date' => ..., 'value' => 13.75]
+// Mensais trazem também reference_month (2026-09). Série fora do ar vem com value null.
 
 // Um indicador; com período (Y-m-d, até 10 anos), a série
+// Service::INDICATORS: selic, cdi, ipca, ipca_12m, igpm, inpc, tr,
+// selic_daily (Selic do dia, % a.d.), cdi_daily (CDI do dia, % a.d.), ipca15 e igpdi
 orchestrator()->getIndicator('ipca');
+orchestrator()->getIndicator('cdi_daily');
 $r = orchestrator()->getIndicator('selic', '2025-01-01', '2025-12-31');
 $r['data']['values'];  // [['date' => '2025-01-01', 'value' => 12.25], ...]
 
@@ -560,6 +608,9 @@ $r['data']['amount'];    // null quando o valor é livre
 ```php
 // NCM com 8 dígitos e a UF. Precisa do token do IBPT no servidor (503 sem ele).
 $r = orchestrator()->getNcmTaxes('8517.13.00', 'SP');
+
+// Produto com exceção tarifária (EX, de 0 a 999)
+$r = orchestrator()->getNcmTaxes('8517.13.00', 'SP', ex: 1);
 ```
 
 ---
@@ -580,6 +631,9 @@ $r['data']['valid'];     // true
 $r['data']['type'];      // mobile | fixed_line ...
 $r['data']['e164'];      // +5521987654321
 $r['data']['national'];  // (21) 98765-4321
+$r['data']['region'];    // BR, US...
+$r['data']['cities'];    // Cidades do DDD (fixo e celular brasileiros)
+$r['data']['suggestion']; // Celular antigo de 8 dígitos: o número com o 9
 ```
 
 ---
@@ -724,7 +778,7 @@ orchestrator()->deleteShippingSender(1);
 
 ### Webhook
 
-O orchestrator avisa cada mudança de status (`shipment.payment_confirmed`, `shipment.purchased`, `shipment.label_ready`, `shipment.posted`, `shipment.delivered`, `shipment.undelivered`, `shipment.cancelled`) numa URL HTTPS pública.
+O orchestrator avisa cada mudança de status (`shipment.payment_confirmed`, `shipment.purchased`, `shipment.label_ready`, `shipment.posted`, `shipment.delivered`, `shipment.undelivered`, `shipment.cancelled`, `shipment.refunded`) numa URL HTTPS pública. O `shipment.refunded` chega quando o PIX volta ao cliente: no cancelamento de etiqueta já comprada, só depois que a transportadora devolve o valor.
 
 ```php
 $r = orchestrator()->setShippingWebhook('https://minhaloja.com.br/webhooks/frete');
@@ -786,11 +840,12 @@ $shipment->isCancelled();
 | `getCNPJ($cnpj)` | Consulta CNPJ |
 | `getZipCode($cep)` | Consulta CEP |
 | `getBanks()` | Lista bancos |
+| `getBank($code)` | Um banco pelo código (`001`) ou ISPB |
 | `getCountries()` | Lista países |
 | `getCountryInfo($country)` | Info de um país (nome, ISO2 ou ISO3) |
 | `getStates($country)` | Estados de um país |
 | `getStateInfo($country, $state)` | Info de um estado |
-| `getCities($country, $state)` | Cidades de um estado |
+| `getCities($country, $state, $name?)` | Cidades de um estado (filtro pelo nome) |
 | `getHolidays($state, $year)` | Feriados estaduais e nacionais |
 | `getWeather($city, $country, $state?)` | Previsão do tempo |
 | `getDomain($domain)` | WHOIS de domínio |
@@ -801,8 +856,8 @@ $shipment->isCancelled();
 | `getFipePrice($type, $brand, $model, $year)` | Preço FIPE |
 | `getExchange($from, $to)` | Cotação de câmbio |
 | `getStock($symbol)` | Cotação de ação B3 ou índice |
-| `getNcm($code)` | NCM por código (8 dígitos) |
-| `searchNcm($term)` | NCM por descrição |
+| `getNcm($code)` | NCM por código (2 a 8 dígitos) |
+| `searchNcm($term?, $page?, $perPage?)` | NCM por descrição, paginado (sem termo: a tabela) |
 | `getStocks($filters?)` | Catálogo de ativos da B3 |
 | `getCnpjPartners($cnpj)` | Sócios do CNPJ (QSA) |
 | `getCnpjSimples($cnpj)` | Simples Nacional e MEI |
@@ -816,7 +871,7 @@ $shipment->isCancelled();
 | `getIndicators()` | Indicadores econômicos (último valor) |
 | `getIndicator($indicator, $from?, $to?)` | Um indicador ou a série |
 | `decodePix($code)` | Lê PIX copia e cola |
-| `getNcmTaxes($code, $uf)` | Tributos do NCM (IBPT) |
+| `getNcmTaxes($code, $uf, $ex?)` | Tributos do NCM (IBPT) |
 | `validateEmail($email)` | Validação de e-mail |
 | `validatePhone($phone)` | Validação de telefone |
 | `getShippingServices()` | Serviços de entrega |

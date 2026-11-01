@@ -28,6 +28,19 @@ dataset('get endpoints', [
     'telefone'              => [fn () => orchestrator()->validatePhone('(21) 98765-4321'), '/phone/21987654321'],
     'telefone com DDI'      => [fn () => orchestrator()->validatePhone('+1 (202) 555-0100'), '/phone/%2B12025550100'],
     'catálogo da B3'        => [fn () => orchestrator()->getStocks(['search' => 'petr', 'type' => null, 'page' => 2]), '/stocks?search=petr&page=2'],
+    'banco pelo código'     => [fn () => orchestrator()->getBank('001'), '/banks/001'],
+    'banco pelo ISPB'       => [fn () => orchestrator()->getBank('00.038.166'), '/banks/00038166'],
+    'cidades'               => [fn () => orchestrator()->getCities('BRA', 'SP'), '/cities/BRA/SP'],
+    'cidades pelo nome'     => [fn () => orchestrator()->getCities('BRA', 'SP', 'sao pau'), '/cities/BRA/SP?name=sao+pau'],
+    'busca de NCM'          => [fn () => orchestrator()->searchNcm('celular'), '/ncm?search=celular'],
+    'busca de NCM paginada' => [fn () => orchestrator()->searchNcm('celular', 2, 50), '/ncm?search=celular&page=2&per_page=50'],
+    'tabela NCM'            => [fn () => orchestrator()->searchNcm(page: 3), '/ncm?page=3'],
+    'tabela NCM inteira'    => [fn () => orchestrator()->searchNcm(), '/ncm'],
+    'NCM curto'             => [fn () => orchestrator()->getNcm('85.17'), '/ncm/8517'],
+    'tributos com EX'       => [fn () => orchestrator()->getNcmTaxes('8517.13.00', 'sp', 1), '/ncm/85171300/taxes?uf=SP&ex=1'],
+    'tributos com EX 0'     => [fn () => orchestrator()->getNcmTaxes('85171300', 'SP', 0), '/ncm/85171300/taxes?uf=SP&ex=0'],
+    'indicador novo'        => [fn () => orchestrator()->getIndicator('IPCA15'), '/indicators/ipca15'],
+    'índice da B3'          => [fn () => orchestrator()->getStock('^bvsp'), '/stocks/%5EBVSP'],
 ]);
 
 it('chama a rota do orchestrator', function (Closure $call, string $path) {
@@ -84,3 +97,22 @@ it('codifica os valores que vão no caminho', function (Closure $call, string $p
 
     Http::assertSent(fn (Request $request) => $request->url() === BASE . $path);
 })->with('path segments');
+
+it('repassa o que vem ao lado de data: a paginação do NCM e as fontes fora do calendário', function () {
+    Http::fake([
+        '*/ncm*'     => Http::response(['success' => true, 'code' => 200, 'data' => [['code' => '01']], 'pagination' => ['current_page' => 2, 'per_page' => 1, 'total' => 2, 'total_pages' => 2]]),
+        '*/calendar' => Http::response(['success' => true, 'code' => 200, 'data' => [['date' => '2026-11-01']], 'unavailable' => ['weather']]),
+    ]);
+
+    expect(orchestrator()->searchNcm('a', 2, 1))->toBe([
+        'success' => true, 'data' => [['code' => '01']], 'status' => 200, 'message' => null,
+        'pagination' => ['current_page' => 2, 'per_page' => 1, 'total' => 2, 'total_pages' => 2],
+    ])
+        ->and(orchestrator()->getCalendar('BR', 'SP', 'São Paulo', '2026-11-01', '2026-11-01')['unavailable'])->toBe(['weather']);
+});
+
+it('a lista de indicadores é a que o orchestrator aceita', function () {
+    expect(\RiseTechApps\OrchestratorLink\Feature\Service::INDICATORS)->toBe([
+        'selic', 'cdi', 'ipca', 'ipca_12m', 'igpm', 'inpc', 'tr', 'selic_daily', 'cdi_daily', 'ipca15', 'igpdi',
+    ]);
+});

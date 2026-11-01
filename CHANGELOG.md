@@ -5,6 +5,23 @@ O formato é baseado em [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Não lançado]
 
+## [1.1.0] - 2026-11-01
+
+Acompanha os endpoints e parâmetros novos do orchestrator. Os métodos novos precisam do servidor atualizado; os que já existiam continuam iguais.
+
+### Adicionado
+
+- `getBank($code)` e a rota proxy `GET /services/banks/{code}`: um banco pelo código de compensação (`1` ou `001`) ou pelo ISPB (8 dígitos).
+- `getCities($country, $state, $name)`: `$name` filtra as cidades pelo trecho do nome, sem acento. A rota proxy repassa `?name=`.
+- `searchNcm($term, $page, $perPage)`: busca paginada (até 500 por página); sem termo, lista a tabela. A rota proxy repassa `page` e `per_page`.
+- `getNcmTaxes($code, $uf, $ex)`: exceção tarifária (EX, 0 a 999). A rota proxy repassa `?ex=`.
+- `Service::INDICATORS`, com os indicadores novos: `selic_daily`, `cdi_daily`, `ipca15` e `igpdi`.
+- O retorno traz o que o orchestrator manda ao lado de `data`: `pagination` na busca de NCM e `unavailable` no calendário (fontes que falharam). Antes esses campos eram descartados.
+
+### Alterado
+
+- README conforme as respostas atuais da API: banco (`ispb`, `short_name`, `logo_url`), CPF (`situation`, `situation_as_of`), CEP (`complement`, `ibge`), feriados (`type` holiday/optional, `level`, `law`), WHOIS (`domain`, `status`, `states`), calendário (país em ISO2 ou ISO3), FIPE (códigos reais, `fuel_code`, `price_value`), câmbio (`source`, `bulletin`), índice da B3 como `^BVSP`, NCM (`level`, `hierarchy`, códigos de 2 a 8 dígitos), telefone (`region`, `suggestion`) e o evento `shipment.refunded` do webhook.
+
 ## [1.0.4] - 2026-10-26
 
 ### Corrigido

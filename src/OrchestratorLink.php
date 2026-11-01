@@ -23,6 +23,7 @@ class OrchestratorLink
 
         // ─── Bancos / Países / Estados / Cidades ─────────────────────────────
         Route::get('/services/banks', [OrchestratorLinkController::class, 'banks']);
+        Route::get('/services/banks/{code}', [OrchestratorLinkController::class, 'bank']);
         Route::get('/services/countries', [OrchestratorLinkController::class, 'countries']);
         Route::get('/services/country/{country}', [OrchestratorLinkController::class, 'countryInfo']);
         Route::get('/services/states/{country}', [OrchestratorLinkController::class, 'states']);

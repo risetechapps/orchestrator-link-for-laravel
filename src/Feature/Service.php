@@ -57,9 +57,21 @@ class Service extends Connection
 
     // ─── Bancos / Países / Estados / Cidades ─────────────────────────────────
 
+    /** Bancos com código de compensação, ISPB, nome, nome curto e logo. */
     public function getBanks(): array
     {
         return static::request('/banks', cacheTtl: self::TTL_STATIC);
+    }
+
+    /**
+     * Um banco pelo código de compensação (`1`, `001`) ou pelo ISPB (8
+     * dígitos, o que o PIX usa). O Banco Central e as câmaras da B3 não têm
+     * código: só o ISPB os acha.
+     */
+    public function getBank(string $code): array
+    {
+        $code = preg_replace('/[^0-9]/', '', $code);
+        return static::request('/banks/' . $code, cacheTtl: self::TTL_STATIC);
     }
 
     public function getCountries(): array
@@ -82,9 +94,11 @@ class Service extends Connection
         return static::request('/states/' . static::segment($country) . '/' . static::segment($state), cacheTtl: self::TTL_STATIC);
     }
 
-    public function getCities(string $country, string $state): array
+    /** Cidades do estado; com `$name`, só as que contêm o trecho (sem acento: "sao pau"). */
+    public function getCities(string $country, string $state, ?string $name = null): array
     {
-        return static::request('/cities/' . static::segment($country) . '/' . static::segment($state), cacheTtl: self::TTL_STATIC);
+        $query = $name ? '?' . http_build_query(['name' => $name]) : '';
+        return static::request('/cities/' . static::segment($country) . '/' . static::segment($state) . $query, cacheTtl: self::TTL_STATIC);
     }
 
     // ─── Localização: código IBGE e geolocalização ───────────────────────────
@@ -132,6 +146,7 @@ class Service extends Connection
         return static::request('/holidays/' . static::segment($year) . '/' . static::segment($state), cacheTtl: self::TTL_STATIC);
     }
 
+    /** Previsão de hoje a 4 dias. País em ISO2 (`BR`, `GB`). */
     public function getWeather(string $city, string $country, string $state = ''): array
     {
         $path = '/weather/' . static::segment($city) . '/' . static::segment($country) . ($state ? '/' . static::segment($state) : '');
@@ -144,6 +159,11 @@ class Service extends Connection
         return static::request('/domain/' . static::segment($domain), cacheTtl: self::TTL_HOUR);
     }
 
+    /**
+     * Feriados e clima dia a dia, de no máximo 3 anos. País em ISO2 ou ISO3;
+     * feriados só no Brasil. `unavailable` (fora de `data`) lista as fontes que
+     * falharam: `holidays` e/ou `weather`.
+     */
     public function getCalendar(string $country, string $state, string $city, string $start, string $end): array
     {
         return static::request('/calendar', 'POST', [
@@ -186,6 +206,7 @@ class Service extends Connection
 
     // ─── Ações B3 ────────────────────────────────────────────────────────────
 
+    /** Cotação de um ativo; índices com `^` (`^BVSP` é o Ibovespa). */
     public function getStock(string $symbol): array
     {
         return static::request('/stocks/' . static::segment(strtoupper($symbol)));
@@ -203,15 +224,24 @@ class Service extends Connection
 
     // ─── Indicadores / PIX ───────────────────────────────────────────────────
 
-    /** Último valor de cada indicador (Selic, CDI, IPCA, IPCA 12m, IGP-M, INPC e TR). */
+    /** Indicadores aceitos em getIndicator(). */
+    public const array INDICATORS = [
+        'selic', 'cdi', 'ipca', 'ipca_12m', 'igpm', 'inpc', 'tr',
+        'selic_daily', 'cdi_daily', 'ipca15', 'igpdi',
+    ];
+
+    /**
+     * Último valor de cada indicador: Selic, CDI, IPCA, IPCA 12m, IGP-M, INPC,
+     * TR, Selic e CDI diários, IPCA-15 e IGP-DI.
+     */
     public function getIndicators(): array
     {
         return static::request('/indicators', cacheTtl: self::TTL_HOUR);
     }
 
     /**
-     * Um indicador: o último valor ou, com `$from` (Y-m-d), a série até `$to`
-     * (padrão hoje), de no máximo 10 anos.
+     * Um indicador (Service::INDICATORS): o último valor ou, com `$from`
+     * (Y-m-d), a série até `$to` (padrão hoje), de no máximo 10 anos.
      */
     public function getIndicator(string $indicator, ?string $from = null, ?string $to = null): array
     {
@@ -227,22 +257,37 @@ class Service extends Connection
 
     // ─── NCM ─────────────────────────────────────────────────────────────────
 
+    /** NCM de 2 a 8 dígitos: capítulo, posição, subposição ou item. */
     public function getNcm(string $code): array
     {
         $code = preg_replace('/[^0-9]/', '', $code);
         return static::request('/ncm/' . $code, cacheTtl: self::TTL_STATIC);
     }
 
-    public function searchNcm(string $term): array
+    /**
+     * Busca NCM pela descrição; sem termo, a tabela inteira. Paginada: até 500
+     * por página (padrão 100), com `pagination` fora de `data`.
+     */
+    public function searchNcm(?string $term = null, ?int $page = null, ?int $perPage = null): array
     {
-        return static::request('/ncm?search=' . urlencode($term), cacheTtl: self::TTL_STATIC);
+        $query = http_build_query(array_filter(
+            ['search' => $term, 'page' => $page, 'per_page' => $perPage],
+            fn ($value) => $value !== null && $value !== ''
+        ));
+
+        return static::request('/ncm' . ($query ? '?' . $query : ''), cacheTtl: self::TTL_STATIC);
     }
 
-    /** Tributos aproximados do NCM (8 dígitos) na UF, pela tabela do IBPT. */
-    public function getNcmTaxes(string $code, string $uf): array
+    /**
+     * Tributos aproximados do NCM (8 dígitos) na UF, pela tabela do IBPT.
+     * `$ex`: a exceção tarifária (0 a 999), quando o produto tem uma.
+     */
+    public function getNcmTaxes(string $code, string $uf, ?int $ex = null): array
     {
-        $code = preg_replace('/[^0-9]/', '', $code);
-        return static::request('/ncm/' . $code . '/taxes?' . http_build_query(['uf' => strtoupper($uf)]), cacheTtl: self::TTL_DAY);
+        $code  = preg_replace('/[^0-9]/', '', $code);
+        $query = http_build_query(array_filter(['uf' => strtoupper($uf), 'ex' => $ex], fn ($value) => $value !== null));
+
+        return static::request('/ncm/' . $code . '/taxes?' . $query, cacheTtl: self::TTL_DAY);
     }
 
     // ─── Validação: e-mail e telefone ────────────────────────────────────────
