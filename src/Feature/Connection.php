@@ -272,7 +272,7 @@ abstract class Connection
         $_response = is_array($_response) ? $_response : [];
 
         // `status` repassa o 201 das criações; `message` traz avisos como o do
-        // secret do webhook, que só aparece uma vez. O que vem ao lado de
+        // segredo do webhook de frete. O que vem ao lado de
         // `data` passa junto: `pagination` na busca de NCM, `unavailable` no
         // calendário.
         return [

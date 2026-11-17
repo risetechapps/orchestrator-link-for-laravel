@@ -149,7 +149,7 @@ Todos os métodos do helper `orchestrator()` retornam:
 
 O que o orchestrator manda ao lado de `data` também vem no retorno: `pagination` na busca de NCM e `unavailable` no calendário.
 
-A `message` do sucesso traz avisos que importam, como o do `setShippingWebhook()` (o `secret` só aparece uma vez). A etiqueta em PDF (`getShipmentLabel`/`getShipmentLabels`) volta com `data.content`, `data.content_type` e `data.filename`.
+A `message` do sucesso traz avisos que importam, como o do `setShippingWebhook()` (de onde vem o `secret`). A etiqueta em PDF (`getShipmentLabel`/`getShipmentLabels`) volta com `data.content`, `data.content_type` e `data.filename`.
 
 `success => false` com `data => []` é o retorno de **qualquer falha** — os métodos **nunca lançam exceção** para não derrubar a request (degradação graciosa). A falha traz também o que o orchestrator respondeu, para mostrar ao usuário:
 
@@ -782,8 +782,10 @@ O orchestrator avisa cada mudança de status (`shipment.payment_confirmed`, `shi
 
 ```php
 $r = orchestrator()->setShippingWebhook('https://minhaloja.com.br/webhooks/frete');
-$secret = $r['data']['secret'];  // mostrado só agora: guarde (ex.: no .env)
+$secret = $r['data']['secret'];  // segredo de webhook da conta: guarde (ex.: no .env)
 ```
+
+Os avisos são assinados com o **segredo de webhook da conta**, um só para todo webhook do orchestrator. Ele também fica no painel, em **Webhooks**, onde pode ser consultado e trocado. Trocar a URL não troca o segredo.
 
 Na rota que recebe:
 
@@ -796,14 +798,17 @@ Route::post('/webhooks/frete', function (Request $request) {
         abort(401);
     }
 
-    // X-Orchestrator-Delivery identifica a entrega: use para não processar duas vezes.
+    // ShippingWebhook::deliveryId() (X-Webhook-Id) identifica o aviso: use para não processar duas vezes.
+    // ShippingWebhook::event() traz o nome do evento (X-Webhook-Event).
     Shipment::syncFromOrchestrator($request->input('data'));
 
     return response()->noContent();
 });
 ```
 
-Resposta fora de 2xx é reenviada até 8 vezes ao longo de ~1 dia. Avisos com mais de 5 minutos são recusados por padrão (`verify(..., tolerance: 300)`).
+Cada aviso leva `X-Webhook-Event`, `X-Webhook-Id`, `X-Webhook-Timestamp` e `X-Webhook-Signature: sha256=<hex>`, o HMAC-SHA256 de `"<timestamp>.<corpo>"` com o segredo. Resposta fora de 2xx é reenviada ao longo de quase 1 dia, e as entregas ficam no painel em Webhooks → Outras entregas. Avisos com mais de 5 minutos são recusados por padrão (`verifyRequest($request, $secret, tolerance: 300)`).
+
+> Desde a 1.2.0 o `X-Orchestrator-Signature` (`t=…,v1=…`) não é mais aceito: precisa do orchestrator-server 1.2.0 ou mais novo.
 
 ### Model Shipment
 

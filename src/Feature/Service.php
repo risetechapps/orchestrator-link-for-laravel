@@ -457,8 +457,9 @@ class Service extends Connection
     }
 
     /**
-     * Cadastra ou troca a URL (HTTPS pública). A resposta traz o `secret` de
-     * assinatura uma única vez: guarde-o para ShippingWebhook::verify().
+     * Cadastra ou troca a URL (HTTPS pública). A resposta traz em `secret` o
+     * segredo de webhook da conta (o da tela Webhooks do painel), para
+     * ShippingWebhook::verifyRequest(). Trocar a URL não troca o segredo.
      */
     public function setShippingWebhook(string $url): array
     {

@@ -5,6 +5,25 @@ O formato é baseado em [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Não lançado]
 
+## [1.2.0] - 2026-11-17
+
+Os avisos de frete passam a usar o padrão da tela Webhooks do orchestrator, com um segredo só por conta. **Precisa do orchestrator-server 1.2.0**: suba as duas versões juntas, porque esta recusa os avisos do servidor 1.1.0, e o servidor 1.2.0 não é aceito pelo client 1.1.0.
+
+### Alterado
+
+- `ShippingWebhook::verifyRequest()` confere `X-Webhook-Signature: sha256=<hex>`, o HMAC-SHA256 de `"<X-Webhook-Timestamp>.<corpo>"` com o segredo de webhook da conta. A chamada continua igual: `verifyRequest($request, $secret, $tolerance)`.
+- `ShippingWebhook::verify()` ganhou o parâmetro `$timestamp`: `verify($body, $signature, $timestamp, $secret, $tolerance)`. Quem chamava `verify()` direto precisa passar o header `X-Webhook-Timestamp`.
+- Constantes: `SIGNATURE_HEADER` = `X-Webhook-Signature`, `EVENT_HEADER` = `X-Webhook-Event`, `DELIVERY_HEADER` = `X-Webhook-Id`, e a nova `TIMESTAMP_HEADER` = `X-Webhook-Timestamp`.
+- O `secret` de `setShippingWebhook()` é o segredo de webhook da conta: o mesmo do painel (Webhooks), que não muda ao trocar a URL. Quem já tinha o webhook de frete cadastrado continua com o mesmo segredo.
+
+### Adicionado
+
+- `ShippingWebhook::event($request)` e `ShippingWebhook::deliveryId($request)`: nome do evento e id do aviso (para deduplicar), pelo header ou pelo corpo.
+
+### Removido
+
+- `X-Orchestrator-Signature` (`t=…,v1=…`), `X-Orchestrator-Event` e `X-Orchestrator-Delivery`.
+
 ## [1.1.0] - 2026-11-01
 
 Acompanha os endpoints e parâmetros novos do orchestrator. Os métodos novos precisam do servidor atualizado; os que já existiam continuam iguais.
